@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<title>Luma Embed AR</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+
+<!-- 引用您自己的 GitHub 庫中的函式庫 -->
+<script src="https://cdn.jsdelivr.net/gh/isaoinvest/ar-libs/aframe.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/isaoinvest/ar-libs/mindar-image-aframe.prod.js"></script>
+
+<style>
+  body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden; /* 避免滾動條 */
+  }
+
+  #luma-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.8); /* 半透明黑色背景 */
+    display: none; /* 初始隱藏 */
+    justify-content: center;
+    align-items: center;
+    z-index: 1000; /* 確保在最上層 */
+  }
+
+  #luma-container {
+    position: relative;
+    width: 90%;
+    height: 80%;
+    max-width: 668px; /* 來自您提供的 iframe */
+    max-height: 500px; /* 來自您提供的 iframe */
+  }
+
+  #luma-container iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    border-radius: 10px;
+  }
+
+  #close-button {
+    position: absolute;
+    top: -15px;
+    right: -15px;
+    width: 30px;
+    height: 30px;
+    background: white;
+    border: 2px solid black;
+    border-radius: 50%;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    z-index: 1001;
+  }
+</style>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const sceneEl = document.querySelector('a-scene');
+  const target = document.querySelector('#ar-target');
+  const overlay = document.getElementById('luma-overlay');
+  const closeButton = document.getElementById('close-button');
+
+  // 當找到目標時顯示 iframe
+  target.addEventListener("targetFound", event => {
+    console.log("Target Found, showing Luma embed.");
+    overlay.style.display = 'flex';
+  });
+
+  // 當目標消失時隱藏 iframe
+  target.addEventListener("targetLost", event => {
+    console.log("Target Lost, hiding Luma embed.");
+    overlay.style.display = 'none';
+  });
+
+  // 點擊關閉按鈕時隱藏 iframe
+  closeButton.addEventListener('click', () => {
+    overlay.style.display = 'none';
+  });
+});
+</script>
+
+</head>
+<body>
+
+<!-- Luma iframe 覆蓋層 -->
+<div id="luma-overlay">
+  <div id="luma-container">
+    <button id="close-button">X</button>
+    <iframe src="https://lumalabs.ai/embed/4da7cf32-865a-4515-8cb9-9dfc574c90c2?mode=lf&background=%23ffffff&color=%23000000&showTitle=true&loadBg=true&logoPosition=bottom-left&infoPosition=bottom-right&cinematicVideo=undefined&showMenu=false" title="luma embed"></iframe>
+  </div>
+</div>
+
+<!-- A-Frame 場景，僅用於 AR 追蹤 -->
+<a-scene
+  mindar-image="imageTargetSrc: https://raw.githubusercontent.com/isaoinvest/AI-coding-AR-TEST/main/targets.mind; autoStart: true; warmupTolerance: 5; missTolerance: 10;"
+  color-space="sRGB"
+  renderer="colorManagement: true, physicallyCorrectLights"
+  vr-mode-ui="enabled: false"
+  device-orientation-permission-ui="enabled: false"
+>
+  <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+  <!-- 這個實體是用來觸發 targetFound/targetLost 事件的 -->
+  <a-entity id="ar-target" mindar-image-target="targetIndex: 0">
+    <!-- 裡面不需要放任何模型，因為我們是用 HTML 覆蓋層來顯示內容 -->
+  </a-entity>
+</a-scene>
+
+</body>
+</html>
