@@ -6,10 +6,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 
 <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@lumaai/luma-web@latest"></script>
+<script type="module" src="https://unpkg.com/@lumaai/luma-web@latest/dist/luma-web.js"></script>
 
 <script src="https://cdn.jsdelivr.net/gh/isaoinvest/ar-libs/aframe.min.js"></script>
-<script src="https://cdn.jsdelivr.com/gh/isaoinvest/ar-libs/mindar-image-aframe.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/isaoinvest/ar-libs/mindar-image-aframe.prod.js"></script>
 
 <style>
   body {
@@ -20,221 +20,233 @@
 </style>
 
 <script>
-// A-Frame 元件：Luma Splats 透射效果
-AFRAME.registerComponent('luma-splats-transmission', {
-  schema: {
-    // 預設使用您的 Luma 場景網址
-    source: { type: 'string', default: 'https://lumalabs.ai/capture/4da7cf32-865a-4515-8cb9-9dfc574c90c2' },
-  },
-
-  init: function () {
-    const { LumaSplatsThree } = window.LumaWeb;
-    const { PerspectiveCamera, WebGLRenderTarget, MathUtils, Mesh, MeshPhysicalMaterial, SphereGeometry, Vector3 } = THREE;
-
-    // 定義 Splat 場景來源
-    this.worldSources = [
-      { source: 'https://lumalabs.ai/capture/4da7cf32-865a-4515-8cb9-9dfc574c90c2', scale: 1 },
-      { source: 'https://lumalabs.ai/capture/d2d2badd-8bdd-4874-84f7-9df2aae27f29', scale: 1 },
-      { source: 'https://lumalabs.ai/capture/da82625c-9c8d-4d05-a9f7-3367ecab438c', scale: 1 },
-    ];
-
-    const innerGlobeRadius = 1;
-    const outerGlobeRadius = 8;
-    const radiusGap = outerGlobeRadius - innerGlobeRadius;
-
-    // 取得 A-Frame 場景和渲染器
-    this.scene = this.el.sceneEl.object3D;
-    this.camera = this.el.sceneEl.camera;
-    this.renderer = this.el.sceneEl.renderer;
-
-    // 設定渲染器
-    this.renderer.toneMapping = THREE.NoToneMapping;
-    this.renderer.localClippingEnabled = false;
-
-    // 內部狀態
-    this.state = {
-      level: 0,
-      innerSplatIndex: NaN,
-      outerSplatIndex: NaN,
-    };
-
-    // 建立折射玻璃球體
-    this.glassGlobe = new Mesh(
-      new SphereGeometry(1, 32, 32),
-      new MeshPhysicalMaterial({
-        roughness: 0,
-        metalness: 0,
-        transparent: true,
-        transmission: 1,
-        ior: 1.341,
-        thickness: 2,
-        envMapIntensity: 1.2,
-        clearcoat: 1,
-        side: THREE.FrontSide,
-      })
-    );
-    this.glassGlobe.scale.setScalar(innerGlobeRadius);
-    this.scene.add(this.glassGlobe);
-
-    // 建立 Splats 場景
-    this.splatWorlds = this.worldSources.map((world, index) => {
-      let splat = new LumaSplatsThree({
-        source: world.source,
-        loadingAnimationEnabled: false,
-        onBeforeRender: (renderer) => {
-          let renderTarget = renderer.getRenderTarget();
-          this.disableMSAA(renderTarget);
-
-          let isWithinGlobe = this.state.innerSplatIndex === index;
-          let isCubeRenderTarget = (renderTarget?.texture)?.isCubeTexture === true;
-
-          if (isCubeRenderTarget) {
-            splat.preventDraw = false;
-          } else {
-            if (isWithinGlobe) {
-              splat.preventDraw = renderTarget == null;
+document.addEventListener('DOMContentLoaded', () => {
+  // 檢查 LumaWeb 是否已載入
+  const checkLumaWeb = setInterval(() => {
+    if (window.LumaWeb && window.LumaWeb.LumaSplatsThree) {
+      clearInterval(checkLumaWeb);
+      
+      // LumaSplatsThree 模組已載入，註冊 A-Frame 元件
+      AFRAME.registerComponent('luma-splats-transmission', {
+        schema: {
+          source: { type: 'string', default: 'https://lumalabs.ai/capture/4da7cf32-865a-4515-8cb9-9dfc574c90c2' },
+        },
+      
+        init: function () {
+          // 確保在 init 內部使用 LumaSplatsThree
+          const { LumaSplatsThree } = window.LumaWeb;
+          const { PerspectiveCamera, WebGLRenderTarget, MathUtils, Mesh, MeshPhysicalMaterial, SphereGeometry, Vector3 } = THREE;
+      
+          this.worldSources = [
+            { source: 'https://lumalabs.ai/capture/4da7cf32-865a-4515-8cb9-9dfc574c90c2', scale: 1 },
+            { source: 'https://lumalabs.ai/capture/d2d2badd-8bdd-4874-84f7-9df2aae27f29', scale: 1 },
+            { source: 'https://lumalabs.ai/capture/da82625c-9c8d-4d05-a9f7-3367ecab438c', scale: 1 },
+          ];
+      
+          const innerGlobeRadius = 1;
+          const outerGlobeRadius = 8;
+          const radiusGap = outerGlobeRadius - innerGlobeRadius;
+      
+          this.scene = this.el.sceneEl.object3D;
+          this.camera = this.el.sceneEl.camera;
+          this.renderer = this.el.sceneEl.renderer;
+      
+          this.renderer.toneMapping = THREE.NoToneMapping;
+          this.renderer.localClippingEnabled = false;
+      
+          this.state = {
+            level: 0,
+            innerSplatIndex: NaN,
+            outerSplatIndex: NaN,
+          };
+      
+          this.glassGlobe = new Mesh(
+            new SphereGeometry(1, 32, 32),
+            new MeshPhysicalMaterial({
+              roughness: 0,
+              metalness: 0,
+              transparent: true,
+              transmission: 1,
+              ior: 1.341,
+              thickness: 2,
+              envMapIntensity: 1.2,
+              clearcoat: 1,
+              side: THREE.FrontSide,
+            })
+          );
+          this.glassGlobe.scale.setScalar(innerGlobeRadius);
+          this.scene.add(this.glassGlobe);
+      
+          this.splatWorlds = this.worldSources.map((world, index) => {
+            let splat = new LumaSplatsThree({
+              source: world.source,
+              loadingAnimationEnabled: false,
+              onBeforeRender: (renderer) => {
+                let renderTarget = renderer.getRenderTarget();
+                this.disableMSAA(renderTarget);
+      
+                let isWithinGlobe = this.state.innerSplatIndex === index;
+                let isCubeRenderTarget = (renderTarget?.texture)?.isCubeTexture === true;
+      
+                if (isCubeRenderTarget) {
+                  splat.preventDraw = false;
+                } else {
+                  if (isWithinGlobe) {
+                    splat.preventDraw = renderTarget == null;
+                  } else {
+                    splat.preventDraw = renderTarget != null;
+                  }
+                }
+              }
+            });
+            splat.scale.setScalar(world.scale);
+            
+            let splatWorld = {
+              environmentMap: null,
+              splat,
+            };
+      
+            splat.onLoad = () => {
+              splat.captureCubemap(this.renderer).then((cubemap) => {
+                splatWorld.environmentMap = cubemap;
+              });
+            };
+      
+            return splatWorld;
+          });
+      
+          this.setVisible(false);
+      
+          this.initialMaterialProperties = {
+            thickness: this.glassGlobe.material.thickness,
+          };
+        },
+      
+        tick: function (time, deltaTime) {
+          if (!this.isVisible) return;
+      
+          const dt_s = deltaTime / 1000;
+          this.updateSplatsAndGlobe(dt_s);
+        },
+      
+        setVisible: function (visible) {
+          this.isVisible = visible;
+          this.glassGlobe.visible = visible;
+          this.splatWorlds.forEach(splatWorld => {
+            if (visible) {
+              this.scene.add(splatWorld.splat);
             } else {
-              splat.preventDraw = renderTarget != null;
+              this.scene.remove(splatWorld.splat);
             }
+          });
+        },
+      
+        updateSplatsAndGlobe: function(dt_s) {
+          const { MathUtils, Vector3 } = THREE;
+          const { camera, scene, glassGlobe, splatWorlds, state, initialMaterialProperties } = this;
+          const { innerGlobeRadius, outerGlobeRadius, radiusGap } = this;
+      
+          let near = (camera).near;
+          let nearPlaneDistanceToCenter = camera.position.length() - near;
+          let innerSurfaceDistance = nearPlaneDistanceToCenter - innerGlobeRadius;
+      
+          const applyCameraModulo = () => {
+            let newInnerSurfaceDistance = MathUtils.euclideanModulo(innerSurfaceDistance, radiusGap);
+            let newCameraDistance = newInnerSurfaceDistance + innerGlobeRadius + near;
+            camera.position.setLength(newCameraDistance);
+            innerSurfaceDistance = newInnerSurfaceDistance;
+            camera.updateWorldMatrix(true, false);
+          };
+      
+          if (innerSurfaceDistance > radiusGap) {
+            applyCameraModulo();
+            state.level++;
+          }
+      
+          if (innerSurfaceDistance < 0) {
+            applyCameraModulo();
+            state.level--;
+          }
+      
+          let cameraU = innerSurfaceDistance / radiusGap;
+      
+          state.innerSplatIndex = MathUtils.euclideanModulo(state.level - 1, splatWorlds.length);
+          state.outerSplatIndex = MathUtils.euclideanModulo(state.level, splatWorlds.length);
+      
+          for (let i = 0; i < splatWorlds.length; i++) {
+            let splatWorld = splatWorlds[i];
+            let splat = splatWorld.splat;
+      
+            let isInnerSplat = state.innerSplatIndex === i;
+            let isOuterSplat = state.outerSplatIndex === i;
+            let isVisible = isInnerSplat || isOuterSplat;
+      
+            splat.enableThreeShaderIntegration = isInnerSplat;
+            splat.material.transparent = !isInnerSplat;
+      
+            if (isVisible) {
+              if (!splat.parent) {
+                scene.add(splat);
+              }
+            } else {
+              if (splat.parent) {
+                scene.remove(splat);
+              }
+            }
+      
+            if (isOuterSplat) {
+              if (scene.environment != splatWorld.environmentMap) {
+                scene.environment = splatWorld.environmentMap;
+                scene.background = splatWorld.environmentMap;
+              }
+            }
+      
+            if (isInnerSplat) {
+              let r = innerGlobeRadius / outerGlobeRadius;
+              splat.scale.setScalar(r);
+            } else {
+              splat.scale.setScalar(1);
+            }
+      
+            if (isVisible) {
+              splat.updateMatrix();
+              splat.updateMatrixWorld();
+            }
+          }
+      
+          glassGlobe.material.thickness = MathUtils.lerp(initialMaterialProperties.thickness, 0, MathUtils.smoothstep(0.2, 0, innerSurfaceDistance));
+          let s = 1 - cameraU;
+          glassGlobe.scale.setScalar(MathUtils.smootherstep(s, 0.0, 0.2));
+          glassGlobe.updateMatrix();
+          glassGlobe.updateMatrixWorld();
+        },
+      
+        disableMSAA: function(target) {
+          if (target) {
+            target.samples = 0;
           }
         }
       });
-      splat.scale.setScalar(world.scale);
-      
-      let splatWorld = {
-        environmentMap: null,
-        splat,
-      };
 
-      splat.onLoad = () => {
-        splat.captureCubemap(this.renderer).then((cubemap) => {
-          splatWorld.environmentMap = cubemap;
-        });
-      };
-
-      return splatWorld;
-    });
-
-    // 初始隱藏所有 Splats 和玻璃球
-    this.setVisible(false);
-
-    // 儲存初始材質屬性以供後續使用
-    this.initialMaterialProperties = {
-      thickness: this.glassGlobe.material.thickness,
-    };
-  },
-
-  tick: function (time, deltaTime) {
-    if (!this.isVisible) return; // 如果不可見，則不更新
-
-    // A-Frame 的 deltaTime 單位是毫秒，這裡轉成秒
-    const dt_s = deltaTime / 1000;
-
-    // A-Frame 已經處理了相機控制，這裡只需要處理 Splat 邏輯
-    this.updateSplatsAndGlobe(dt_s);
-  },
-
-  // 顯示或隱藏所有物體
-  setVisible: function (visible) {
-    this.isVisible = visible;
-    this.glassGlobe.visible = visible;
-    this.splatWorlds.forEach(splatWorld => {
-      if (visible) {
-        // 在顯示時重新加入場景
-        this.scene.add(splatWorld.splat);
-      } else {
-        this.scene.remove(splatWorld.splat);
-      }
-    });
-  },
-
-  // 更新 Splats 和玻璃球的邏輯
-  updateSplatsAndGlobe: function(dt_s) {
-    const { MathUtils, Vector3 } = THREE;
-    const { camera, scene, glassGlobe, splatWorlds, state, initialMaterialProperties } = this;
-    const { innerGlobeRadius, outerGlobeRadius, radiusGap } = this;
-
-    // 檢查相機位置
-    let near = (camera).near;
-    let nearPlaneDistanceToCenter = camera.position.length() - near;
-    let innerSurfaceDistance = nearPlaneDistanceToCenter - innerGlobeRadius;
-
-    const applyCameraModulo = () => {
-      let newInnerSurfaceDistance = MathUtils.euclideanModulo(innerSurfaceDistance, radiusGap);
-      let newCameraDistance = newInnerSurfaceDistance + innerGlobeRadius + near;
-      camera.position.setLength(newCameraDistance);
-      innerSurfaceDistance = newInnerSurfaceDistance;
-      camera.updateWorldMatrix(true, false);
-    };
-
-    if (innerSurfaceDistance > radiusGap) {
-      applyCameraModulo();
-      state.level++;
-    }
-
-    if (innerSurfaceDistance < 0) {
-      applyCameraModulo();
-      state.level--;
-    }
-
-    let cameraU = innerSurfaceDistance / radiusGap;
-
-    state.innerSplatIndex = MathUtils.euclideanModulo(state.level - 1, splatWorlds.length);
-    state.outerSplatIndex = MathUtils.euclideanModulo(state.level, splatWorlds.length);
-
-    for (let i = 0; i < splatWorlds.length; i++) {
-      let splatWorld = splatWorlds[i];
-      let splat = splatWorld.splat;
-
-      let isInnerSplat = state.innerSplatIndex === i;
-      let isOuterSplat = state.outerSplatIndex === i;
-      let isVisible = isInnerSplat || isOuterSplat;
-
-      splat.enableThreeShaderIntegration = isInnerSplat;
-      splat.material.transparent = !isInnerSplat;
-
-      if (isVisible) {
-        if (!splat.parent) {
-          scene.add(splat);
+      // 註冊 A-Frame 元件後，綁定 AR 事件處理
+      const target = document.querySelector('#ar-target');
+      target.addEventListener("targetFound", event => {
+        console.log("Target Found, showing Luma Splats.");
+        const lumaComponent = target.components['luma-splats-transmission'];
+        if (lumaComponent) {
+          lumaComponent.setVisible(true);
         }
-      } else {
-        if (splat.parent) {
-          scene.remove(splat);
+      });
+
+      target.addEventListener("targetLost", event => {
+        console.log("Target Lost, hiding Luma Splats.");
+        const lumaComponent = target.components['luma-splats-transmission'];
+        if (lumaComponent) {
+          lumaComponent.setVisible(false);
         }
-      }
-
-      if (isOuterSplat) {
-        if (scene.environment != splatWorld.environmentMap) {
-          scene.environment = splatWorld.environmentMap;
-          scene.background = splatWorld.environmentMap;
-        }
-      }
-
-      if (isInnerSplat) {
-        let r = innerGlobeRadius / outerGlobeRadius;
-        splat.scale.setScalar(r);
-      } else {
-        splat.scale.setScalar(1);
-      }
-
-      if (isVisible) {
-        splat.updateMatrix();
-        splat.updateMatrixWorld();
-      }
+      });
     }
-
-    glassGlobe.material.thickness = MathUtils.lerp(initialMaterialProperties.thickness, 0, MathUtils.smoothstep(0.2, 0, innerSurfaceDistance));
-    let s = 1 - cameraU;
-    glassGlobe.scale.setScalar(MathUtils.smootherstep(s, 0.0, 0.2));
-    glassGlobe.updateMatrix();
-    glassGlobe.updateMatrixWorld();
-  },
-
-  disableMSAA: function(target) {
-    if (target) {
-      target.samples = 0;
-    }
-  }
+  }, 100); // 每 100ms 檢查一次
 });
 </script>
 
@@ -255,7 +267,7 @@ AFRAME.registerComponent('luma-splats-transmission', {
     mindar-image-target="targetIndex: 0"
     luma-splats-transmission
   >
-    </a-entity>
+  </a-entity>
 </a-scene>
 
 </body>
