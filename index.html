@@ -1,13 +1,14 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
-
 <head>
   <meta charset="UTF-8">
-  <title>Luma AR Shader + MindAR</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Luma Shader + MindAR 整合</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body {
+    html, body {
       margin: 0;
+      padding: 0;
+      height: 100%;
       overflow: hidden;
     }
     #ar-container {
@@ -15,22 +16,16 @@
       height: 100vh;
       position: relative;
     }
-    canvas, video {
-      position: absolute;
-      top: 0;
-      left: 0;
-    }
   </style>
 </head>
-
 <body>
   <div id="ar-container"></div>
 
   <script type="importmap">
     {
       "imports": {
-        "three": "https://cdn.skypack.dev/three@0.155.0",
-        "dat.gui": "https://cdn.skypack.dev/dat.gui",
+        "three": "https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.module.js",
+        "dat.gui": "https://cdn.jsdelivr.net/npm/dat.gui@0.7.9/build/dat.gui.module.js",
         "@lumaai/luma-web": "https://cdn.skypack.dev/@lumaai/luma-web",
         "mindar-image-three": "https://cdn.jsdelivr.net/npm/mind-ar@1.1.4/dist/mindar-image-three.prod.js"
       }
@@ -45,12 +40,9 @@
 
     const mindarThree = new MindARThree({
       container: document.querySelector("#ar-container"),
-      imageTargetSrc: "https://raw.githubusercontent.com/isaoinvest/webAR-TEST/main/targets.mind",
-      uiLoading: "yes",
-      uiScanning: "yes",
-      maxTrack: 1,
-      filterMinCF: 0.0001,
-      filterBeta: 1000,
+      imageTargetSrc: "./targets.mind", // 確保此檔案與本 HTML 同資料夾
+      uiLoading: true,
+      uiScanning: true
     });
 
     const { renderer, scene, camera } = mindarThree;
@@ -106,6 +98,7 @@
         (layersEnabled.background ? 1 : 0) |
         (layersEnabled.foreground ? 2 : 0);
     }
+
     updateSemanticMask();
 
     const layersFolder = gui.addFolder('layers');
@@ -125,5 +118,4 @@
     });
   </script>
 </body>
-
 </html>
