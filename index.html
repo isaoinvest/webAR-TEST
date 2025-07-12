@@ -1,267 +1,118 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
+
 <head>
-<title>Luma Splats AR</title>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<meta name="apple-mobile-web-app-capable" content="yes" />
-
-<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
-<script type="module" src="https://unpkg.com/@lumaai/luma-web@latest/dist/luma-web.js"></script>
-
-<script src="https://cdn.jsdelivr.net/gh/isaoinvest/ar-libs/aframe.min.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/isaoinvest/ar-libs/mindar-image-aframe.prod.js"></script>
-
-<style>
-  body {
-    margin: 0;
-    padding: 0;
-    overflow: hidden;
-  }
-</style>
-
-<script type="module">
-  // 從 Luma Splats 模組中匯入 LumaSplatsThree 類別
-  import { LumaSplatsThree } from "https://unpkg.com/@lumaai/luma-web@latest/dist/luma-web.js";
-
-  // 在 DOM 載入後執行程式碼
-  document.addEventListener('DOMContentLoaded', () => {
-    AFRAME.registerComponent('luma-splats-transmission', {
-      schema: {
-        source: { type: 'string', default: 'https://lumalabs.ai/capture/4da7cf32-865a-4515-8cb9-9dfc574c90c2' },
-      },
-    
-      init: function () {
-        const { PerspectiveCamera, WebGLRenderTarget, MathUtils, Mesh, MeshPhysicalMaterial, SphereGeometry, Vector3 } = THREE;
-    
-        this.worldSources = [
-          { source: 'https://lumalabs.ai/capture/4da7cf32-865a-4515-8cb9-9dfc574c90c2', scale: 1 },
-          { source: 'https://lumalabs.ai/capture/d2d2badd-8bdd-4874-84f7-9df2aae27f29', scale: 1 },
-          { source: 'https://lumalabs.ai/capture/da82625c-9c8d-4d05-a9f7-3367ecab438c', scale: 1 },
-        ];
-    
-        const innerGlobeRadius = 1;
-        const outerGlobeRadius = 8;
-        const radiusGap = outerGlobeRadius - innerGlobeRadius;
-    
-        this.scene = this.el.sceneEl.object3D;
-        this.camera = this.el.sceneEl.camera;
-        this.renderer = this.el.sceneEl.renderer;
-    
-        this.renderer.toneMapping = THREE.NoToneMapping;
-        this.renderer.localClippingEnabled = false;
-    
-        this.state = {
-          level: 0,
-          innerSplatIndex: NaN,
-          outerSplatIndex: NaN,
-        };
-    
-        this.glassGlobe = new Mesh(
-          new SphereGeometry(1, 32, 32),
-          new MeshPhysicalMaterial({
-            roughness: 0,
-            metalness: 0,
-            transparent: true,
-            transmission: 1,
-            ior: 1.341,
-            thickness: 2,
-            envMapIntensity: 1.2,
-            clearcoat: 1,
-            side: THREE.FrontSide,
-          })
-        );
-        this.glassGlobe.scale.setScalar(innerGlobeRadius);
-        this.scene.add(this.glassGlobe);
-    
-        this.splatWorlds = this.worldSources.map((world, index) => {
-          let splat = new LumaSplatsThree({
-            source: world.source,
-            loadingAnimationEnabled: false,
-            onBeforeRender: (renderer) => {
-              let renderTarget = renderer.getRenderTarget();
-              this.disableMSAA(renderTarget);
-    
-              let isWithinGlobe = this.state.innerSplatIndex === index;
-              let isCubeRenderTarget = (renderTarget?.texture)?.isCubeTexture === true;
-    
-              if (isCubeRenderTarget) {
-                splat.preventDraw = false;
-              } else {
-                if (isWithinGlobe) {
-                  splat.preventDraw = renderTarget == null;
-                } else {
-                  splat.preventDraw = renderTarget != null;
-                }
-              }
-            }
-          });
-          splat.scale.setScalar(world.scale);
-          
-          let splatWorld = {
-            environmentMap: null,
-            splat,
-          };
-    
-          splat.onLoad = () => {
-            splat.captureCubemap(this.renderer).then((cubemap) => {
-              splatWorld.environmentMap = cubemap;
-            });
-          };
-    
-          return splatWorld;
-        });
-    
-        this.setVisible(false);
-    
-        this.initialMaterialProperties = {
-          thickness: this.glassGlobe.material.thickness,
-        };
-      },
-    
-      tick: function (time, deltaTime) {
-        if (!this.isVisible) return;
-    
-        const dt_s = deltaTime / 1000;
-        this.updateSplatsAndGlobe(dt_s);
-      },
-    
-      setVisible: function (visible) {
-        this.isVisible = visible;
-        this.glassGlobe.visible = visible;
-        this.splatWorlds.forEach(splatWorld => {
-          if (visible) {
-            this.scene.add(splatWorld.splat);
-          } else {
-            this.scene.remove(splatWorld.splat);
-          }
-        });
-      },
-    
-      updateSplatsAndGlobe: function(dt_s) {
-        const { MathUtils, Vector3 } = THREE;
-        const { camera, scene, glassGlobe, splatWorlds, state, initialMaterialProperties } = this;
-        const { innerGlobeRadius, outerGlobeRadius, radiusGap } = this;
-    
-        let near = (camera).near;
-        let nearPlaneDistanceToCenter = camera.position.length() - near;
-        let innerSurfaceDistance = nearPlaneDistanceToCenter - innerGlobeRadius;
-    
-        const applyCameraModulo = () => {
-          let newInnerSurfaceDistance = MathUtils.euclideanModulo(innerSurfaceDistance, radiusGap);
-          let newCameraDistance = newInnerSurfaceDistance + innerGlobeRadius + near;
-          camera.position.setLength(newCameraDistance);
-          innerSurfaceDistance = newInnerSurfaceDistance;
-          camera.updateWorldMatrix(true, false);
-        };
-    
-        if (innerSurfaceDistance > radiusGap) {
-          applyCameraModulo();
-          state.level++;
-        }
-    
-        if (innerSurfaceDistance < 0) {
-          applyCameraModulo();
-          state.level--;
-        }
-    
-        let cameraU = innerSurfaceDistance / radiusGap;
-    
-        state.innerSplatIndex = MathUtils.euclideanModulo(state.level - 1, splatWorlds.length);
-        state.outerSplatIndex = MathUtils.euclideanModulo(state.level, splatWorlds.length);
-    
-        for (let i = 0; i < splatWorlds.length; i++) {
-          let splatWorld = splatWorlds[i];
-          let splat = splatWorld.splat;
-    
-          let isInnerSplat = state.innerSplatIndex === i;
-          let isOuterSplat = state.outerSplatIndex === i;
-          let isVisible = isInnerSplat || isOuterSplat;
-    
-          splat.enableThreeShaderIntegration = isInnerSplat;
-          splat.material.transparent = !isInnerSplat;
-    
-          if (isVisible) {
-            if (!splat.parent) {
-              scene.add(splat);
-            }
-          } else {
-            if (splat.parent) {
-              scene.remove(splat);
-            }
-          }
-    
-          if (isOuterSplat) {
-            if (scene.environment != splatWorld.environmentMap) {
-              scene.environment = splatWorld.environmentMap;
-              scene.background = splatWorld.environmentMap;
-            }
-          }
-    
-          if (isInnerSplat) {
-            let r = innerGlobeRadius / outerGlobeRadius;
-            splat.scale.setScalar(r);
-          } else {
-            splat.scale.setScalar(1);
-          }
-    
-          if (isVisible) {
-            splat.updateMatrix();
-            splat.updateMatrixWorld();
-          }
-        }
-    
-        glassGlobe.material.thickness = MathUtils.lerp(initialMaterialProperties.thickness, 0, MathUtils.smoothstep(0.2, 0, innerSurfaceDistance));
-        let s = 1 - cameraU;
-        glassGlobe.scale.setScalar(MathUtils.smootherstep(s, 0.0, 0.2));
-        glassGlobe.updateMatrix();
-        glassGlobe.updateMatrixWorld();
-      },
-    
-      disableMSAA: function(target) {
-        if (target) {
-          target.samples = 0;
-        }
-      }
-    });
-
-    const target = document.querySelector('#ar-target');
-    target.addEventListener("targetFound", event => {
-      console.log("Target Found, showing Luma Splats.");
-      const lumaComponent = target.components['luma-splats-transmission'];
-      if (lumaComponent) {
-        lumaComponent.setVisible(true);
-      }
-    });
-
-    target.addEventListener("targetLost", event => {
-      console.log("Target Lost, hiding Luma Splats.");
-      const lumaComponent = target.components['luma-splats-transmission'];
-      if (lumaComponent) {
-        lumaComponent.setVisible(false);
-      }
-    });
-  });
-</script>
-
+  <meta charset="UTF-8">
+  <title>Luma AR Shader + MindAR</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
+    canvas, video {
+      display: block;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+  </style>
 </head>
+
 <body>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.skypack.dev/three@0.155.0",
+        "dat.gui": "https://cdn.skypack.dev/dat.gui",
+        "@lumaai/luma-web": "https://cdn.skypack.dev/@lumaai/luma-web",
+        "mindar-face-three": "https://cdn.jsdelivr.net/npm/mind-ar@1.1.4/dist/mindar-image-three.prod.js"
+      }
+    }
+  </script>
 
-<a-scene
-  mindar-image="imageTargetSrc: https://raw.githubusercontent.com/isaoinvest/AI-coding-AR-TEST/main/targets.mind; autoStart: true; warmupTolerance: 5; missTolerance: 10;"
-  color-space="sRGB"
-  renderer="colorManagement: true, physicallyCorrectLights"
-  vr-mode-ui="enabled: false"
-  device-orientation-permission-ui="enabled: false"
->
-  <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+  <script type="module">
+    import * as THREE from 'three';
+    import { GUI } from 'dat.gui';
+    import { LumaSplatsThree } from '@lumaai/luma-web';
+    import { MindARThree } from 'mindar-face-three';
 
-  <a-entity
-    id="ar-target"
-    mindar-image-target="targetIndex: 0"
-    luma-splats-transmission
-  >
-  </a-entity>
-</a-scene>
+    const mindarThree = new MindARThree({
+      container: document.body,
+      imageTargetSrc: "https://raw.githubusercontent.com/isaoinvest/AI-coding-AR-TEST/main/targets.mind"
+    });
 
+    const { renderer, scene, camera } = mindarThree;
+
+    const gui = new GUI();
+    const uniformTime = new THREE.Uniform(0);
+
+    const splats = new LumaSplatsThree({
+      source: 'https://lumalabs.ai/capture/da82625c-9c8d-4d05-a9f7-3367ecab438c',
+      enableThreeShaderIntegration: true,
+      onBeforeRender: () => {
+        uniformTime.value = performance.now() / 1000;
+      }
+    });
+
+    splats.setShaderHooks({
+      vertexShaderHooks: {
+        additionalUniforms: {
+          time_s: ['float', uniformTime],
+        },
+        getSplatTransform: /* glsl */`
+          (vec3 position, uint layersBitmask) {
+            float x = 0.;
+            float z = 0.;
+            float y = sin(position.x * 1.0 + time_s) * 0.1;
+            return mat4(
+              1., 0., 0., 0,
+              0., 1., 0., 0,
+              0., 0., 1., 0,
+              x,  y,  z, 1.
+            );
+          }
+        `
+      }
+    });
+
+    splats.onInitialCameraTransform = transform => {
+      camera.matrix.copy(transform);
+      camera.matrix.decompose(camera.position, camera.quaternion, camera.scale);
+      camera.updateMatrixWorld();
+    };
+
+    const anchor = mindarThree.addAnchor(0);
+    anchor.group.add(splats);
+
+    let layersEnabled = {
+      background: true,
+      foreground: true,
+    };
+
+    function updateSemanticMask() {
+      splats.semanticsMask =
+        (layersEnabled.background ? 1 : 0) |
+        (layersEnabled.foreground ? 2 : 0);
+    }
+    updateSemanticMask();
+
+    const layersFolder = gui.addFolder('layers');
+    layersFolder.add(layersEnabled, 'background').onChange(updateSemanticMask);
+    layersFolder.add(layersEnabled, 'foreground').onChange(updateSemanticMask);
+    layersFolder.hide();
+
+    scene.fog = new THREE.FogExp2(0xEEEEEE, 0.05);
+    scene.background = scene.fog.color;
+    gui.add(scene.fog, 'density', 0, 0.3).name('fog density');
+    gui.addColor(scene.fog, 'color').name('fog color');
+
+    await mindarThree.start();
+
+    renderer.setAnimationLoop(() => {
+      renderer.render(scene, camera);
+    });
+  </script>
 </body>
+
 </html>
