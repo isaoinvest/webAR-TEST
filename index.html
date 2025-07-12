@@ -10,8 +10,12 @@
       margin: 0;
       overflow: hidden;
     }
+    #ar-container {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
     canvas, video {
-      display: block;
       position: absolute;
       top: 0;
       left: 0;
@@ -20,13 +24,15 @@
 </head>
 
 <body>
+  <div id="ar-container"></div>
+
   <script type="importmap">
     {
       "imports": {
         "three": "https://cdn.skypack.dev/three@0.155.0",
         "dat.gui": "https://cdn.skypack.dev/dat.gui",
         "@lumaai/luma-web": "https://cdn.skypack.dev/@lumaai/luma-web",
-        "mindar-face-three": "https://cdn.jsdelivr.net/npm/mind-ar@1.1.4/dist/mindar-image-three.prod.js"
+        "mindar-image-three": "https://cdn.jsdelivr.net/npm/mind-ar@1.1.4/dist/mindar-image-three.prod.js"
       }
     }
   </script>
@@ -35,11 +41,16 @@
     import * as THREE from 'three';
     import { GUI } from 'dat.gui';
     import { LumaSplatsThree } from '@lumaai/luma-web';
-    import { MindARThree } from 'mindar-face-three';
+    import { MindARThree } from 'mindar-image-three';
 
     const mindarThree = new MindARThree({
-      container: document.body,
-      imageTargetSrc: "https://raw.githubusercontent.com/isaoinvest/AI-coding-AR-TEST/main/targets.mind"
+      container: document.querySelector("#ar-container"),
+      imageTargetSrc: "https://raw.githubusercontent.com/isaoinvest/AI-coding-AR-TEST/main/targets.mind",
+      uiLoading: "yes",
+      uiScanning: "yes",
+      maxTrack: 1,
+      filterMinCF: 0.0001,
+      filterBeta: 1000,
     });
 
     const { renderer, scene, camera } = mindarThree;
