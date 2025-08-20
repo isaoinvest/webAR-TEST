@@ -2,419 +2,1100 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Video Hologram Effect</title>
+    <title>Advanced Holographic Video System</title>
     <style>
-        body { 
-            margin: 0; 
-            background: black; 
-            overflow: hidden;
-            font-family: Arial, sans-serif;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-        canvas { display: block; }
+        
+        body { 
+            background: #000;
+            overflow: hidden;
+            font-family: 'Courier New', monospace;
+            cursor: crosshair;
+        }
+        
+        canvas { 
+            display: block;
+            filter: contrast(1.1) brightness(1.05);
+        }
+        
         #loading {
-            position: absolute;
+            position: fixed;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            color: white;
-            font-size: 20px;
+            color: #00ffff;
+            font-size: 24px;
             z-index: 100;
+            text-shadow: 0 0 20px #00ffff;
+            animation: pulse 1.5s infinite;
         }
-        #videoInput {
-            position: absolute;
-            top: 10px;
-            left: 10px;
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        #controlPanel {
+            position: fixed;
+            top: 20px;
+            left: 20px;
             z-index: 100;
-            padding: 10px;
-            background: rgba(0,0,0,0.7);
+            background: linear-gradient(135deg, rgba(0,20,40,0.95), rgba(0,40,80,0.95));
+            border: 1px solid #00ffff;
+            border-radius: 10px;
+            padding: 20px;
+            color: #00ffff;
+            box-shadow: 0 0 30px rgba(0,255,255,0.3);
+            backdrop-filter: blur(10px);
+            max-width: 350px;
+        }
+        
+        #controlPanel h3 {
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-size: 14px;
+            text-shadow: 0 0 10px #00ffff;
+        }
+        
+        .control-group {
+            margin-bottom: 15px;
+        }
+        
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 12px;
+            color: #66ffff;
+        }
+        
+        input[type="file"] {
+            width: 100%;
+            padding: 8px;
+            background: rgba(0,50,100,0.5);
+            border: 1px solid #00ffff;
+            color: #00ffff;
             border-radius: 5px;
-            color: white;
+            margin-bottom: 10px;
         }
-        #videoInput input {
-            margin-right: 10px;
-        }
-        #videoInput button {
-            padding: 5px 10px;
+        
+        button {
+            width: 100%;
+            padding: 10px;
+            background: linear-gradient(135deg, #00ffff, #0088ff);
+            border: none;
+            color: #000;
+            font-weight: bold;
+            border-radius: 5px;
             cursor: pointer;
-            margin-right: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s;
+            margin-bottom: 5px;
         }
-        #volumeControl {
-            display: inline-block;
-            margin-left: 10px;
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0,255,255,0.5);
         }
-        #volumeControl label {
-            margin-right: 5px;
+        
+        input[type="range"] {
+            width: 100%;
+            appearance: none;
+            height: 5px;
+            background: linear-gradient(90deg, #00ffff, #0088ff);
+            border-radius: 5px;
+            outline: none;
         }
-        #volumeControl input {
-            vertical-align: middle;
+        
+        input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            width: 15px;
+            height: 15px;
+            background: #00ffff;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 10px #00ffff;
+        }
+        
+        .value-display {
+            float: right;
+            color: #ffff00;
+            font-weight: bold;
+        }
+        
+        #stats {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            color: #00ff00;
+            font-size: 12px;
+            font-family: monospace;
+            background: rgba(0,0,0,0.8);
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #00ff00;
+        }
+        
+        .preset-btn {
+            background: linear-gradient(135deg, #ff00ff, #00ffff);
+            margin-top: 10px;
+        }
+        
+        #effectToggle {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px;
+            margin-top: 10px;
+        }
+        
+        .toggle-btn {
+            padding: 5px;
+            font-size: 11px;
+            background: rgba(0,255,255,0.2);
+            border: 1px solid #00ffff;
+        }
+        
+        .toggle-btn.active {
+            background: linear-gradient(135deg, #00ffff, #0088ff);
+            color: #000;
         }
     </style>
 </head>
 <body>
-    <div id="loading">Loading...</div>
-    <div id="videoInput">
-        <input type="file" id="fileInput" accept="video/*">
-        <button id="defaultVideo">Use Default Video</button>
-        <div id="volumeControl">
-            <label for="volume">Volume:</label>
-            <input type="range" id="volume" min="0" max="100" value="50">
-            <span id="volumeValue">50%</span>
+    <div id="loading">INITIALIZING HOLOGRAPHIC SYSTEM...</div>
+    
+    <div id="controlPanel">
+        <h3>🎬 Holographic Control System</h3>
+        
+        <div class="control-group">
+            <input type="file" id="fileInput" accept="video/*">
+            <button id="defaultVideo">Load Demo Video</button>
+            <button id="sampleVideo2">Load Tech Demo</button>
         </div>
+        
+        <div class="control-group">
+            <label>Volume <span class="value-display" id="volumeValue">50%</span></label>
+            <input type="range" id="volume" min="0" max="100" value="50">
+        </div>
+        
+        <div class="control-group">
+            <label>Hologram Density <span class="value-display" id="densityValue">3</span></label>
+            <input type="range" id="density" min="1" max="5" value="3" step="1">
+        </div>
+        
+        <div class="control-group">
+            <label>Scan Lines <span class="value-display" id="scanValue">0.5</span></label>
+            <input type="range" id="scanlines" min="0" max="1" value="0.5" step="0.1">
+        </div>
+        
+        <div class="control-group">
+            <label>Glitch Intensity <span class="value-display" id="glitchValue">0.3</span></label>
+            <input type="range" id="glitch" min="0" max="1" value="0.3" step="0.1">
+        </div>
+        
+        <div class="control-group">
+            <label>Chromatic Aberration <span class="value-display" id="chromaValue">0.5</span></label>
+            <input type="range" id="chroma" min="0" max="2" value="0.5" step="0.1">
+        </div>
+        
+        <div class="control-group">
+            <label>Depth Scale <span class="value-display" id="depthValue">150</span></label>
+            <input type="range" id="depth" min="0" max="300" value="150">
+        </div>
+        
+        <div class="control-group">
+            <label>Rotation Speed <span class="value-display" id="rotationValue">0.2</span></label>
+            <input type="range" id="rotation" min="0" max="1" value="0.2" step="0.1">
+        </div>
+        
+        <button class="preset-btn" id="presetCyber">CYBER MODE</button>
+        <button class="preset-btn" id="presetMatrix">MATRIX MODE</button>
+        <button class="preset-btn" id="presetClean">CLEAN MODE</button>
+        
+        <div id="effectToggle">
+            <button class="toggle-btn active" data-effect="particles">Particles</button>
+            <button class="toggle-btn active" data-effect="wireframe">Wireframe</button>
+            <button class="toggle-btn active" data-effect="glow">Glow</button>
+            <button class="toggle-btn active" data-effect="distortion">Distortion</button>
+        </div>
+    </div>
+    
+    <div id="stats">
+        <div>FPS: <span id="fps">60</span></div>
+        <div>Particles: <span id="particleCount">0</span></div>
+        <div>Draw Calls: <span id="drawCalls">0</span></div>
     </div>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.9/dat.gui.min.js"></script>
     <script>
-        let scene, camera, renderer, controls;
-        let points, material;
-        let animationId;
-
-        // Setup scene, camera, renderer
-        scene = new THREE.Scene();
-        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(window.devicePixelRatio);
-        document.body.appendChild(renderer.domElement);
-
-        // Simple orbit controls implementation
-        class SimpleOrbitControls {
-            constructor(camera, domElement) {
-                this.camera = camera;
-                this.domElement = domElement;
-                this.target = new THREE.Vector3();
-                
-                this.rotateSpeed = 1.0;
-                this.zoomSpeed = 1.2;
-                
-                this.spherical = new THREE.Spherical();
-                this.sphericalDelta = new THREE.Spherical();
-                
-                this.scale = 1;
-                this.panOffset = new THREE.Vector3();
-                
-                this.mouseDown = false;
-                this.mouseX = 0;
-                this.mouseY = 0;
-                
-                this.domElement.addEventListener('mousedown', this.onMouseDown.bind(this));
-                this.domElement.addEventListener('mousemove', this.onMouseMove.bind(this));
-                this.domElement.addEventListener('mouseup', this.onMouseUp.bind(this));
-                this.domElement.addEventListener('wheel', this.onMouseWheel.bind(this));
-                
-                this.update();
+        // Global variables
+        let scene, camera, renderer, composer;
+        let hologramGroup, particles, wireframeMesh, glowMesh;
+        let material, wireframeMaterial, glowMaterial;
+        let video, videoTexture;
+        let clock = new THREE.Clock();
+        let stats = { fps: 60, lastTime: performance.now(), frames: 0 };
+        
+        // Configuration
+        const config = {
+            density: 3,
+            scanlines: 0.5,
+            glitch: 0.3,
+            chroma: 0.5,
+            depth: 150,
+            rotation: 0.2,
+            effects: {
+                particles: true,
+                wireframe: true,
+                glow: true,
+                distortion: true
             }
+        };
+        
+        // Initialize Three.js
+        function init() {
+            // Scene setup
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x000000, 0.001);
             
-            onMouseDown(event) {
-                this.mouseDown = true;
-                this.mouseX = event.clientX;
-                this.mouseY = event.clientY;
-            }
+            // Camera setup
+            camera = new THREE.PerspectiveCamera(
+                75, 
+                window.innerWidth / window.innerHeight, 
+                0.1, 
+                2000
+            );
+            camera.position.set(0, 0, 400);
             
-            onMouseMove(event) {
-                if (!this.mouseDown) return;
-                
-                const deltaX = event.clientX - this.mouseX;
-                const deltaY = event.clientY - this.mouseY;
-                
-                this.mouseX = event.clientX;
-                this.mouseY = event.clientY;
-                
-                this.sphericalDelta.theta -= deltaX * 0.01 * this.rotateSpeed;
-                this.sphericalDelta.phi -= deltaY * 0.01 * this.rotateSpeed;
-            }
+            // Renderer setup
+            renderer = new THREE.WebGLRenderer({ 
+                antialias: true,
+                alpha: true,
+                powerPreference: "high-performance"
+            });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.body.appendChild(renderer.domElement);
             
-            onMouseUp() {
-                this.mouseDown = false;
-            }
+            // Hologram group
+            hologramGroup = new THREE.Group();
+            scene.add(hologramGroup);
             
-            onMouseWheel(event) {
-                if (event.deltaY < 0) {
-                    this.scale /= this.zoomSpeed;
-                } else {
-                    this.scale *= this.zoomSpeed;
-                }
-            }
+            // Lighting
+            setupLighting();
             
-            update() {
-                const offset = new THREE.Vector3();
-                const quat = new THREE.Quaternion().setFromUnitVectors(
-                    this.camera.up, new THREE.Vector3(0, 1, 0)
-                );
-                const position = this.camera.position;
-                
-                offset.copy(position).sub(this.target);
-                offset.applyQuaternion(quat);
-                
-                this.spherical.setFromVector3(offset);
-                this.spherical.theta += this.sphericalDelta.theta;
-                this.spherical.phi += this.sphericalDelta.phi;
-                this.spherical.phi = Math.max(0.01, Math.min(Math.PI - 0.01, this.spherical.phi));
-                this.spherical.radius *= this.scale;
-                this.spherical.radius = Math.max(50, Math.min(1000, this.spherical.radius));
-                
-                offset.setFromSpherical(this.spherical);
-                offset.applyQuaternion(quat.invert());
-                
-                position.copy(this.target).add(offset);
-                this.camera.lookAt(this.target);
-                
-                this.sphericalDelta.theta *= 0.9;
-                this.sphericalDelta.phi *= 0.9;
-                this.scale = 1;
-            }
+            // Post-processing
+            setupPostProcessing();
+            
+            // Controls
+            setupControls();
+            
+            // Event listeners
+            setupEventListeners();
+            
+            // Start animation
+            animate();
         }
-
-        controls = new SimpleOrbitControls(camera, renderer.domElement);
-
-        function createHologramEffect(videoElement) {
-            // Remove existing points if any
-            if (points) {
-                scene.remove(points);
-                if (points.geometry) points.geometry.dispose();
-                if (points.material) points.material.dispose();
+        
+        // Advanced lighting setup
+        function setupLighting() {
+            // Ambient light
+            const ambientLight = new THREE.AmbientLight(0x0088ff, 0.2);
+            scene.add(ambientLight);
+            
+            // Point lights for holographic effect
+            const colors = [0x00ffff, 0xff00ff, 0xffff00];
+            for (let i = 0; i < 3; i++) {
+                const light = new THREE.PointLight(colors[i], 0.5, 500);
+                light.position.set(
+                    Math.sin(i * Math.PI * 2 / 3) * 200,
+                    Math.cos(i * Math.PI * 2 / 3) * 200,
+                    100
+                );
+                scene.add(light);
             }
-
-            // Particle system parameters
-            const width = 256;
-            const height = 144;
+            
+            // Directional light
+            const dirLight = new THREE.DirectionalLight(0x00ffff, 0.3);
+            dirLight.position.set(0, 100, 200);
+            scene.add(dirLight);
+        }
+        
+        // Post-processing setup
+        function setupPostProcessing() {
+            // This would normally use EffectComposer, but for compatibility
+            // we'll simulate effects in shaders
+        }
+        
+        // Mouse controls
+        function setupControls() {
+            let mouseX = 0, mouseY = 0;
+            let targetX = 0, targetY = 0;
+            
+            document.addEventListener('mousemove', (e) => {
+                mouseX = (e.clientX - window.innerWidth / 2) / window.innerWidth;
+                mouseY = (e.clientY - window.innerHeight / 2) / window.innerHeight;
+            });
+            
+            // Smooth camera movement
+            function updateCamera() {
+                targetX += (mouseX - targetX) * 0.05;
+                targetY += (mouseY - targetY) * 0.05;
+                
+                camera.position.x = targetX * 100;
+                camera.position.y = -targetY * 100;
+                camera.lookAt(scene.position);
+            }
+            
+            renderer.domElement.addEventListener('wheel', (e) => {
+                camera.position.z += e.deltaY * 0.5;
+                camera.position.z = Math.max(100, Math.min(800, camera.position.z));
+            });
+            
+            // Add to animation loop
+            window.updateCamera = updateCamera;
+        }
+        
+        // Create holographic video effect
+        function createHologram(videoElement) {
+            // Clear previous hologram
+            if (hologramGroup) {
+                hologramGroup.clear();
+            }
+            
+            // Video texture
+            videoTexture = new THREE.VideoTexture(videoElement);
+            videoTexture.minFilter = THREE.LinearFilter;
+            videoTexture.magFilter = THREE.LinearFilter;
+            
+            // Get density setting
+            const densityMap = {
+                1: { width: 128, height: 72 },
+                2: { width: 192, height: 108 },
+                3: { width: 256, height: 144 },
+                4: { width: 320, height: 180 },
+                5: { width: 384, height: 216 }
+            };
+            
+            const { width, height } = densityMap[config.density];
             const particleCount = width * height;
-
-            // Geometry
+            
+            // Update particle count display
+            document.getElementById('particleCount').textContent = particleCount;
+            
+            // Create particle system
+            if (config.effects.particles) {
+                createParticleSystem(width, height);
+            }
+            
+            // Create wireframe mesh
+            if (config.effects.wireframe) {
+                createWireframe(width, height);
+            }
+            
+            // Create glow effect
+            if (config.effects.glow) {
+                createGlowEffect();
+            }
+            
+            document.getElementById('loading').style.display = 'none';
+        }
+        
+        // Advanced particle system
+        function createParticleSystem(width, height) {
+            const particleCount = width * height;
             const geometry = new THREE.BufferGeometry();
+            
             const positions = new Float32Array(particleCount * 3);
             const uvs = new Float32Array(particleCount * 2);
-
+            const indices = new Float32Array(particleCount);
+            
             for (let i = 0; i < width; i++) {
                 for (let j = 0; j < height; j++) {
                     const index = j * width + i;
+                    
                     positions[index * 3] = (i / width - 0.5) * 400;
                     positions[index * 3 + 1] = (j / height - 0.5) * 225;
                     positions[index * 3 + 2] = 0;
-
+                    
                     uvs[index * 2] = i / (width - 1);
-                    uvs[index * 2 + 1] = j / (height - 1); // 修正：移除翻轉
+                    uvs[index * 2 + 1] = j / (height - 1);
+                    
+                    indices[index] = index;
                 }
             }
-
+            
             geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
             geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
-
-            // Create video texture
-            const videoTexture = new THREE.VideoTexture(videoElement);
-            videoTexture.minFilter = THREE.LinearFilter;
-            videoTexture.magFilter = THREE.LinearFilter;
-            videoTexture.format = THREE.RGBFormat;
-
-            // Shader material
+            geometry.setAttribute('index', new THREE.BufferAttribute(indices, 1));
+            
+            // Advanced holographic shader
             material = new THREE.ShaderMaterial({
                 uniforms: {
                     video: { value: videoTexture },
-                    depthScale: { value: 100 },
-                    particleSize: { value: 2.0 },
                     time: { value: 0 },
-                    curlAmplitude: { value: 20 },
-                    curlFrequency: { value: 0.01 },
-                    curlSpeed: { value: 0.5 }
+                    depthScale: { value: config.depth },
+                    scanlines: { value: config.scanlines },
+                    glitchIntensity: { value: config.glitch },
+                    chromaticAberration: { value: config.chroma },
+                    distortion: { value: config.effects.distortion ? 1.0 : 0.0 },
+                    resolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) }
                 },
                 vertexShader: `
+                    varying vec2 vUv;
                     varying vec3 vColor;
+                    varying float vDepth;
+                    varying vec3 vPosition;
+                    
                     uniform sampler2D video;
-                    uniform float depthScale;
-                    uniform float particleSize;
                     uniform float time;
-                    uniform float curlAmplitude;
-                    uniform float curlFrequency;
-                    uniform float curlSpeed;
-
-                    // Simplified noise function
-                    float random(vec2 st) {
-                        return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
+                    uniform float depthScale;
+                    uniform float distortion;
+                    
+                    attribute float index;
+                    
+                    // Noise functions
+                    vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+                    vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+                    vec4 permute(vec4 x) { return mod289(((x*34.0)+1.0)*x); }
+                    
+                    float noise(vec3 p) {
+                        vec3 a = floor(p);
+                        vec3 d = p - a;
+                        d = d * d * (3.0 - 2.0 * d);
+                        vec4 b = a.xxyy + vec4(0.0, 1.0, 0.0, 1.0);
+                        vec4 k1 = permute(b.xyxy);
+                        vec4 k2 = permute(k1.xyxy + b.zzww);
+                        vec4 c = k2 + a.zzzz;
+                        vec4 k3 = permute(c);
+                        vec4 k4 = permute(c + 1.0);
+                        vec4 o1 = fract(k3 * (1.0 / 41.0));
+                        vec4 o2 = fract(k4 * (1.0 / 41.0));
+                        vec4 o3 = o2 * d.z + o1 * (1.0 - d.z);
+                        vec2 o4 = o3.yw * d.x + o3.xz * (1.0 - d.x);
+                        return o4.y * d.y + o4.x * (1.0 - d.y);
                     }
-
-                    float noise(vec2 st) {
-                        vec2 i = floor(st);
-                        vec2 f = fract(st);
-                        float a = random(i);
-                        float b = random(i + vec2(1.0, 0.0));
-                        float c = random(i + vec2(0.0, 1.0));
-                        float d = random(i + vec2(1.0, 1.0));
-                        vec2 u = f * f * (3.0 - 2.0 * f);
-                        return mix(a, b, u.x) + (c - a)* u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
-                    }
-
+                    
                     void main() {
+                        vUv = uv;
                         vec4 color = texture2D(video, uv);
                         vColor = color.rgb;
                         
                         // Calculate luminance for depth
-                        float luminance = 0.299 * color.r + 0.587 * color.g + 0.114 * color.b;
+                        float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+                        vDepth = luminance;
                         
                         vec3 pos = position;
+                        
+                        // Z-depth based on luminance
                         pos.z = -luminance * depthScale;
                         
-                        // Add some animated noise displacement
-                        float noiseVal = noise(uv * 10.0 + time * curlSpeed);
-                        pos.x += sin(time + uv.y * 10.0) * curlAmplitude * noiseVal * 0.1;
-                        pos.y += cos(time + uv.x * 10.0) * curlAmplitude * noiseVal * 0.1;
-                        pos.z += noiseVal * curlAmplitude * 0.5;
+                        // Wave distortion
+                        float wave = sin(uv.x * 10.0 + time * 2.0) * cos(uv.y * 10.0 + time * 1.5);
+                        pos.z += wave * 5.0 * distortion;
                         
+                        // Noise-based displacement
+                        vec3 noisePos = vec3(uv * 5.0, time * 0.5);
+                        float n = noise(noisePos);
+                        pos.xy += vec2(n) * 10.0 * distortion;
+                        
+                        // Pulsing effect
+                        float pulse = sin(time * 3.0 + index * 0.001) * 0.5 + 0.5;
+                        pos.z += pulse * 5.0;
+                        
+                        vPosition = pos;
                         gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-                        gl_PointSize = particleSize * (1.0 + luminance * 0.5);
+                        
+                        // Dynamic point size based on depth and luminance
+                        float size = 2.0 + luminance * 3.0;
+                        size *= (1.0 + pulse * 0.5);
+                        gl_PointSize = size;
                     }
                 `,
                 fragmentShader: `
+                    varying vec2 vUv;
                     varying vec3 vColor;
+                    varying float vDepth;
+                    varying vec3 vPosition;
+                    
+                    uniform float time;
+                    uniform float scanlines;
+                    uniform float glitchIntensity;
+                    uniform float chromaticAberration;
+                    uniform vec2 resolution;
+                    
+                    // Random function
+                    float random(vec2 st) {
+                        return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
+                    }
+                    
                     void main() {
-                        // Create circular points
                         vec2 coord = gl_PointCoord - vec2(0.5);
-                        if(length(coord) > 0.5) discard;
+                        float dist = length(coord);
                         
-                        float alpha = 1.0 - smoothstep(0.4, 0.5, length(coord));
-                        gl_FragColor = vec4(vColor, alpha);
+                        // Circular point with soft edge
+                        if(dist > 0.5) discard;
+                        
+                        vec3 color = vColor;
+                        
+                        // Chromatic aberration
+                        float aberration = chromaticAberration * 0.01;
+                        color.r = vColor.r * (1.0 + aberration);
+                        color.g = vColor.g;
+                        color.b = vColor.b * (1.0 - aberration);
+                        
+                        // Holographic color shift
+                        float holo = sin(vPosition.x * 0.1 + time) * 0.5 + 0.5;
+                        color = mix(color, vec3(0.0, 1.0, 1.0), holo * 0.3);
+                        
+                        // Scanlines
+                        float scanline = sin(gl_FragCoord.y * 0.5 + time * 10.0) * 0.5 + 0.5;
+                        color *= mix(1.0, scanline, scanlines);
+                        
+                        // Glitch effect
+                        float glitch = random(vec2(time * 0.1, vUv.y));
+                        if(glitch < glitchIntensity * 0.1) {
+                            color = vec3(1.0 - color.r, color.g, 1.0 - color.b);
+                        }
+                        
+                        // Edge glow
+                        float edge = 1.0 - smoothstep(0.3, 0.5, dist);
+                        color += vec3(0.0, 0.5, 1.0) * (1.0 - edge) * 0.5;
+                        
+                        // Depth-based brightness
+                        float brightness = 0.8 + vDepth * 0.4;
+                        color *= brightness;
+                        
+                        // Flickering
+                        float flicker = sin(time * 50.0) * 0.05 + 0.95;
+                        color *= flicker;
+                        
+                        float alpha = edge * (0.7 + vDepth * 0.3);
+                        gl_FragColor = vec4(color, alpha);
                     }
                 `,
                 transparent: true,
-                depthTest: true,
-                blending: THREE.AdditiveBlending
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
             });
-
-            points = new THREE.Points(geometry, material);
-            scene.add(points);
-
-            // Setup GUI
-            if (window.gui) {
-                window.gui.destroy();
-            }
             
-            window.gui = new dat.GUI();
-            window.gui.add(material.uniforms.depthScale, 'value', 0, 200, 1).name('Depth Scale');
-            window.gui.add(material.uniforms.particleSize, 'value', 0.1, 5, 0.1).name('Particle Size');
-            window.gui.add(material.uniforms.curlAmplitude, 'value', 0, 50, 1).name('Curl Amplitude');
-            window.gui.add(material.uniforms.curlFrequency, 'value', 0.001, 0.1, 0.001).name('Curl Frequency');
-            window.gui.add(material.uniforms.curlSpeed, 'value', 0, 2, 0.1).name('Curl Speed');
-
-            document.getElementById('loading').style.display = 'none';
+            particles = new THREE.Points(geometry, material);
+            hologramGroup.add(particles);
         }
-
-        // Video setup
+        
+        // Create wireframe overlay
+        function createWireframe(width, height) {
+            const geometry = new THREE.PlaneGeometry(400, 225, width/4, height/4);
+            
+            wireframeMaterial = new THREE.ShaderMaterial({
+                uniforms: {
+                    video: { value: videoTexture },
+                    time: { value: 0 },
+                    depthScale: { value: config.depth }
+                },
+                vertexShader: `
+                    varying vec2 vUv;
+                    varying float vDepth;
+                    
+                    uniform sampler2D video;
+                    uniform float depthScale;
+                    uniform float time;
+                    
+                    void main() {
+                        vUv = uv;
+                        vec4 color = texture2D(video, uv);
+                        float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+                        vDepth = luminance;
+                        
+                        vec3 pos = position;
+                        pos.z = -luminance * depthScale * 0.5;
+                        
+                        // Wave effect
+                        pos.z += sin(pos.x * 0.05 + time) * 10.0;
+                        pos.z += cos(pos.y * 0.05 + time) * 10.0;
+                        
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    varying vec2 vUv;
+                    varying float vDepth;
+                    
+                    uniform float time;
+                    
+                    void main() {
+                        vec3 color = vec3(0.0, 1.0, 1.0);
+                        float alpha = 0.1 + vDepth * 0.2;
+                        
+                        // Pulsing effect
+                        alpha *= 0.8 + sin(time * 5.0) * 0.2;
+                        
+                        gl_FragColor = vec4(color, alpha);
+                    }
+                `,
+                wireframe: true,
+                transparent: true,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            
+            wireframeMesh = new THREE.Mesh(geometry, wireframeMaterial);
+            hologramGroup.add(wireframeMesh);
+        }
+        
+        // Create glow effect
+        function createGlowEffect() {
+            const geometry = new THREE.PlaneGeometry(450, 250);
+            
+            glowMaterial = new THREE.ShaderMaterial({
+                uniforms: {
+                    time: { value: 0 },
+                    color: { value: new THREE.Color(0x00ffff) }
+                },
+                vertexShader: `
+                    varying vec2 vUv;
+                    void main() {
+                        vUv = uv;
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    varying vec2 vUv;
+                    uniform float time;
+                    uniform vec3 color;
+                    
+                    void main() {
+                        vec2 center = vec2(0.5, 0.5);
+                        float dist = distance(vUv, center);
+                        
+                        float glow = 1.0 - smoothstep(0.0, 0.5, dist);
+                        glow = pow(glow, 2.0);
+                        
+                        vec3 finalColor = color * glow;
+                        float pulse = sin(time * 2.0) * 0.5 + 0.5;
+                        
+                        gl_FragColor = vec4(finalColor, glow * 0.3 * pulse);
+                    }
+                `,
+                transparent: true,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                side: THREE.DoubleSide
+            });
+            
+            glowMesh = new THREE.Mesh(geometry, glowMaterial);
+            glowMesh.position.z = -100;
+            hologramGroup.add(glowMesh);
+        }
+        
+        // Setup video
         function setupVideo(src, isObjectURL = false) {
-            // 清理之前的 video element
-            const existingVideo = document.querySelector('video');
-            if (existingVideo) {
-                existingVideo.pause();
-                existingVideo.remove();
+            if (video) {
+                video.pause();
+                video.remove();
             }
             
-            const video = document.createElement('video');
+            video = document.createElement('video');
             video.crossOrigin = 'anonymous';
             video.loop = true;
-            video.muted = false; // 啟用聲音
-            video.controls = false; // 隱藏控制條
+            video.muted = false;
             video.playsInline = true;
-            video.volume = 0.5; // 設定音量為 50%
+            video.volume = 0.5;
+            video.style.display = 'none';
+            document.body.appendChild(video);
             
             video.addEventListener('loadeddata', () => {
-                console.log('Video loaded successfully');
                 video.play().then(() => {
-                    createHologramEffect(video);
-                    document.getElementById('loading').style.display = 'none';
+                    createHologram(video);
                 }).catch(err => {
-                    console.error('Video play failed:', err);
-                    // 如果自動播放失敗（通常是因為聲音），提示用戶點擊
-                    document.getElementById('loading').textContent = 'Click anywhere to start';
+                    document.getElementById('loading').textContent = 'Click to start';
                     document.addEventListener('click', () => {
-                        video.muted = false; // 確保聲音開啟
                         video.play();
-                        createHologramEffect(video);
-                        document.getElementById('loading').style.display = 'none';
+                        createHologram(video);
                     }, { once: true });
                 });
             });
-
+            
             video.addEventListener('error', (e) => {
                 console.error('Video error:', e);
-                document.getElementById('loading').textContent = 'Video loading failed. Please try another video.';
+                document.getElementById('loading').textContent = 'Video loading failed';
             });
-
-            // 設定影片來源
-            if (isObjectURL) {
-                video.src = src;
-            } else {
-                video.src = src;
-            }
             
-            // 確保影片元素被加入到 DOM（雖然隱藏）
-            video.style.display = 'none';
-            document.body.appendChild(video);
+            video.src = src;
         }
-
-        // File input handler
-        document.getElementById('fileInput').addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file && file.type.startsWith('video/')) {
-                document.getElementById('loading').style.display = 'block';
-                document.getElementById('loading').textContent = 'Loading video...';
-                const url = URL.createObjectURL(file);
-                setupVideo(url, true);
-            }
-        });
-
-        // Default video button
-        document.getElementById('defaultVideo').addEventListener('click', () => {
-            document.getElementById('loading').style.display = 'block';
-            document.getElementById('loading').textContent = 'Loading video...';
-            // *** 在這裡更換預設影片 URL ***
-            // 可以使用以下任一種方式：
-            // 1. 網路影片 URL（需要支援 CORS）
-            // 2. 本地伺服器的影片路徑
-            // 3. 任何可公開訪問的影片 URL
-            
-            // 範例影片（可替換成您的影片 URL）：
-            const defaultVideoURL = 'https://raw.githubusercontent.com/isaoinvest/webAR-TEST/main/TEST%20VEDIO.mp4';
-    
-            
-            setupVideo(defaultVideoURL, false);
-        });
-
-        camera.position.z = 300;
-
+        
         // Animation loop
-        const clock = new THREE.Clock();
         function animate() {
-            animationId = requestAnimationFrame(animate);
+            requestAnimationFrame(animate);
             
+            const time = clock.getElapsedTime();
+            
+            // Update materials
             if (material) {
-                material.uniforms.time.value = clock.getElapsedTime();
+                material.uniforms.time.value = time;
+                material.uniforms.depthScale.value = config.depth;
+                material.uniforms.scanlines.value = config.scanlines;
+                material.uniforms.glitchIntensity.value = config.glitch;
+                material.uniforms.chromaticAberration.value = config.chroma;
+                material.uniforms.distortion.value = config.effects.distortion ? 1.0 : 0.0;
             }
             
-            controls.update();
+            if (wireframeMaterial) {
+                wireframeMaterial.uniforms.time.value = time;
+                wireframeMaterial.uniforms.depthScale.value = config.depth;
+            }
+            
+            if (glowMaterial) {
+                glowMaterial.uniforms.time.value = time;
+            }
+            
+            // Rotate hologram
+            if (hologramGroup && config.rotation > 0) {
+                hologramGroup.rotation.y += config.rotation * 0.01;
+            }
+            
+            // Update camera
+            if (window.updateCamera) {
+                window.updateCamera();
+            }
+            
+            // Update stats
+            updateStats();
+            
+            // Render
             renderer.render(scene, camera);
         }
-        animate();
-
-        // Resize handler
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-
-        // Start with default video
-        document.getElementById('loading').textContent = 'Click "Use Default Video" or upload your own video file';
         
-        // Volume control
-        const volumeSlider = document.getElementById('volume');
-        const volumeValue = document.getElementById('volumeValue');
-        
-        volumeSlider.addEventListener('input', (e) => {
-            const volume = e.target.value;
-            volumeValue.textContent = volume + '%';
-            const video = document.querySelector('video');
-            if (video) {
-                video.volume = volume / 100;
+        // Update performance stats
+        function updateStats() {
+            stats.frames++;
+            const currentTime = performance.now();
+            if (currentTime >= stats.lastTime + 1000) {
+                stats.fps = Math.round(stats.frames * 1000 / (currentTime - stats.lastTime));
+                document.getElementById('fps').textContent = stats.fps;
+                stats.lastTime = currentTime;
+                stats.frames = 0;
+                
+                // Update draw calls
+                if (renderer.info) {
+                    document.getElementById('drawCalls').textContent = renderer.info.render.calls || 0;
+                }
             }
+        }
+        
+        // Setup event listeners
+        function setupEventListeners() {
+            // Window resize
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                
+                if (material) {
+                    material.uniforms.resolution.value.set(window.innerWidth, window.innerHeight);
+                }
+            });
+            
+            // File input
+            document.getElementById('fileInput').addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file && file.type.startsWith('video/')) {
+                    document.getElementById('loading').style.display = 'block';
+                    document.getElementById('loading').textContent = 'LOADING VIDEO...';
+                    const url = URL.createObjectURL(file);
+                    setupVideo(url, true);
+                }
+            });
+            
+            // Default video buttons
+            document.getElementById('defaultVideo').addEventListener('click', () => {
+                document.getElementById('loading').style.display = 'block';
+                document.getElementById('loading').textContent = 'LOADING DEMO...';
+                setupVideo('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4');
+            });
+            
+            document.getElementById('sampleVideo2').addEventListener('click', () => {
+                document.getElementById('loading').style.display = 'block';
+                document.getElementById('loading').textContent = 'LOADING TECH DEMO...';
+                setupVideo('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4');
+            });
+            
+            // Volume control
+            const volumeSlider = document.getElementById('volume');
+            volumeSlider.addEventListener('input', (e) => {
+                const volume = e.target.value;
+                document.getElementById('volumeValue').textContent = volume + '%';
+                if (video) {
+                    video.volume = volume / 100;
+                }
+            });
+            
+            // Density control
+            document.getElementById('density').addEventListener('input', (e) => {
+                config.density = parseInt(e.target.value);
+                document.getElementById('densityValue').textContent = config.density;
+                if (video && video.readyState >= 2) {
+                    createHologram(video);
+                }
+            });
+            
+            // Scanlines control
+            document.getElementById('scanlines').addEventListener('input', (e) => {
+                config.scanlines = parseFloat(e.target.value);
+                document.getElementById('scanValue').textContent = config.scanlines;
+            });
+            
+            // Glitch control
+            document.getElementById('glitch').addEventListener('input', (e) => {
+                config.glitch = parseFloat(e.target.value);
+                document.getElementById('glitchValue').textContent = config.glitch;
+            });
+            
+            // Chromatic aberration control
+            document.getElementById('chroma').addEventListener('input', (e) => {
+                config.chroma = parseFloat(e.target.value);
+                document.getElementById('chromaValue').textContent = config.chroma;
+            });
+            
+            // Depth control
+            document.getElementById('depth').addEventListener('input', (e) => {
+                config.depth = parseFloat(e.target.value);
+                document.getElementById('depthValue').textContent = config.depth;
+            });
+            
+            // Rotation control
+            document.getElementById('rotation').addEventListener('input', (e) => {
+                config.rotation = parseFloat(e.target.value);
+                document.getElementById('rotationValue').textContent = config.rotation;
+            });
+            
+            // Preset buttons
+            document.getElementById('presetCyber').addEventListener('click', () => {
+                applyPreset({
+                    density: 4,
+                    scanlines: 0.8,
+                    glitch: 0.5,
+                    chroma: 1.5,
+                    depth: 200,
+                    rotation: 0.3
+                });
+            });
+            
+            document.getElementById('presetMatrix').addEventListener('click', () => {
+                applyPreset({
+                    density: 5,
+                    scanlines: 1.0,
+                    glitch: 0.7,
+                    chroma: 0.3,
+                    depth: 250,
+                    rotation: 0.1
+                });
+            });
+            
+            document.getElementById('presetClean').addEventListener('click', () => {
+                applyPreset({
+                    density: 3,
+                    scanlines: 0,
+                    glitch: 0,
+                    chroma: 0,
+                    depth: 100,
+                    rotation: 0.5
+                });
+            });
+            
+            // Effect toggles
+            document.querySelectorAll('.toggle-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const effect = e.target.dataset.effect;
+                    config.effects[effect] = !config.effects[effect];
+                    e.target.classList.toggle('active');
+                    
+                    // Update visibility
+                    switch(effect) {
+                        case 'particles':
+                            if (particles) particles.visible = config.effects.particles;
+                            break;
+                        case 'wireframe':
+                            if (wireframeMesh) wireframeMesh.visible = config.effects.wireframe;
+                            break;
+                        case 'glow':
+                            if (glowMesh) glowMesh.visible = config.effects.glow;
+                            break;
+                        case 'distortion':
+                            // Handled in shader uniform
+                            break;
+                    }
+                });
+            });
+            
+            // Keyboard shortcuts
+            document.addEventListener('keydown', (e) => {
+                switch(e.key) {
+                    case ' ':
+                        if (video) {
+                            if (video.paused) {
+                                video.play();
+                            } else {
+                                video.pause();
+                            }
+                        }
+                        e.preventDefault();
+                        break;
+                    case 'r':
+                        config.rotation = config.rotation > 0 ? 0 : 0.2;
+                        document.getElementById('rotation').value = config.rotation;
+                        document.getElementById('rotationValue').textContent = config.rotation;
+                        break;
+                    case 'f':
+                        if (document.fullscreenElement) {
+                            document.exitFullscreen();
+                        } else {
+                            document.documentElement.requestFullscreen();
+                        }
+                        break;
+                }
+            });
+        }
+        
+        // Apply preset configuration
+        function applyPreset(preset) {
+            Object.keys(preset).forEach(key => {
+                config[key] = preset[key];
+                const slider = document.getElementById(key === 'chroma' ? 'chroma' : 
+                                                      key === 'scanlines' ? 'scanlines' : 
+                                                      key === 'glitch' ? 'glitch' : 
+                                                      key === 'depth' ? 'depth' : 
+                                                      key === 'rotation' ? 'rotation' : 
+                                                      key === 'density' ? 'density' : null);
+                if (slider) {
+                    slider.value = preset[key];
+                    const valueDisplay = document.getElementById(
+                        key === 'chroma' ? 'chromaValue' : 
+                        key === 'scanlines' ? 'scanValue' : 
+                        key === 'glitch' ? 'glitchValue' : 
+                        key === 'depth' ? 'depthValue' : 
+                        key === 'rotation' ? 'rotationValue' : 
+                        key === 'density' ? 'densityValue' : null
+                    );
+                    if (valueDisplay) {
+                        valueDisplay.textContent = preset[key];
+                    }
+                }
+            });
+            
+            // Recreate hologram if video is ready
+            if (video && video.readyState >= 2) {
+                createHologram(video);
+            }
+        }
+        
+        // Add cyberpunk-style background effects
+        function createBackgroundEffects() {
+            // Create grid floor
+            const gridHelper = new THREE.GridHelper(2000, 50, 0x00ffff, 0x004444);
+            gridHelper.position.y = -200;
+            scene.add(gridHelper);
+            
+            // Add floating particles
+            const particleCount = 500;
+            const particleGeometry = new THREE.BufferGeometry();
+            const particlePositions = new Float32Array(particleCount * 3);
+            
+            for (let i = 0; i < particleCount; i++) {
+                particlePositions[i * 3] = (Math.random() - 0.5) * 1000;
+                particlePositions[i * 3 + 1] = (Math.random() - 0.5) * 1000;
+                particlePositions[i * 3 + 2] = (Math.random() - 0.5) * 1000;
+            }
+            
+            particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+            
+            const particleMaterial = new THREE.PointsMaterial({
+                color: 0x00ffff,
+                size: 2,
+                transparent: true,
+                opacity: 0.5,
+                blending: THREE.AdditiveBlending
+            });
+            
+            const backgroundParticles = new THREE.Points(particleGeometry, particleMaterial);
+            scene.add(backgroundParticles);
+            
+            // Animate background particles
+            function animateBackground() {
+                backgroundParticles.rotation.y += 0.0005;
+                backgroundParticles.rotation.x += 0.0002;
+            }
+            
+            window.animateBackground = animateBackground;
+        }
+        
+        // Initialize when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            init();
+            createBackgroundEffects();
+            
+            // Show initial message
+            document.getElementById('loading').textContent = 'SELECT A VIDEO TO BEGIN';
+            
+            // Auto-load demo after 2 seconds
+            setTimeout(() => {
+                if (!video) {
+                    document.getElementById('defaultVideo').click();
+                }
+            }, 2000);
         });
-    </script>
-</body>
-</html>
+        
+        // Add to animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            const time = clock.getElapsedTime();
+            
+            // Update materials
+            if (material) {
+                material.uniforms.time.value = time;
+                material.uniforms.depthScale.value = config.depth;
+                material.uniforms.scanlines.value = config.scanlines;
+                material.uniforms.glitchIntensity.value = config.glitch;
+                material.uniforms.chromaticAberration.value = config.chroma;
+                material.uniforms.distortion.value = config.effects.distortion ? 1.0 : 0.0;
+            }
+            
+            if (wireframeMaterial) {
+                wireframeMaterial.uniforms.time.value = time;
+                wireframeMaterial.uniforms.depthScale.value = config.depth;
+            }
+            
+            if (glowMaterial) {
+                glowMaterial.uniforms.time.value = time;
+            }
+            
+            // Rotate hologram
+            if (hologramGroup && config.rotation > 0) {
+                hologramGroup.rotation.y += config.rotation * 0.01;
+            }
+            
+            // Update camera
+            if (window.updateCamera) {
+                window.updateCamera();
+            }
+            
+            // Animate background
+            if (window.animateBackground) {
+                window.animateBackground();
+            }
+            
+            // Update stats
+            updateStats();
+            
+            // Render
+            renderer.render(scene, camera);
+        }
