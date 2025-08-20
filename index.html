@@ -28,6 +28,7 @@
             padding: 10px;
             background: rgba(0,0,0,0.7);
             border-radius: 5px;
+            color: white;
         }
         #videoInput input {
             margin-right: 10px;
@@ -35,6 +36,17 @@
         #videoInput button {
             padding: 5px 10px;
             cursor: pointer;
+            margin-right: 10px;
+        }
+        #volumeControl {
+            display: inline-block;
+            margin-left: 10px;
+        }
+        #volumeControl label {
+            margin-right: 5px;
+        }
+        #volumeControl input {
+            vertical-align: middle;
         }
     </style>
 </head>
@@ -43,6 +55,11 @@
     <div id="videoInput">
         <input type="file" id="fileInput" accept="video/*">
         <button id="defaultVideo">Use Default Video</button>
+        <div id="volumeControl">
+            <label for="volume">Volume:</label>
+            <input type="range" id="volume" min="0" max="100" value="50">
+            <span id="volumeValue">50%</span>
+        </div>
     </div>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -176,7 +193,7 @@
                     positions[index * 3 + 2] = 0;
 
                     uvs[index * 2] = i / (width - 1);
-                    uvs[index * 2 + 1] = 1 - j / (height - 1);
+                    uvs[index * 2 + 1] = j / (height - 1); // 修正：移除翻轉
                 }
             }
 
@@ -281,22 +298,36 @@
         }
 
         // Video setup
-        function setupVideo(src) {
+        function setupVideo(src, isObjectURL = false) {
+            // 清理之前的 video element
+            const existingVideo = document.querySelector('video');
+            if (existingVideo) {
+                existingVideo.pause();
+                existingVideo.remove();
+            }
+            
             const video = document.createElement('video');
             video.crossOrigin = 'anonymous';
             video.loop = true;
-            video.muted = true;
+            video.muted = false; // 啟用聲音
+            video.controls = false; // 隱藏控制條
             video.playsInline = true;
+            video.volume = 0.5; // 設定音量為 50%
             
             video.addEventListener('loadeddata', () => {
+                console.log('Video loaded successfully');
                 video.play().then(() => {
                     createHologramEffect(video);
+                    document.getElementById('loading').style.display = 'none';
                 }).catch(err => {
                     console.error('Video play failed:', err);
-                    document.getElementById('loading').textContent = 'Click to play video';
+                    // 如果自動播放失敗（通常是因為聲音），提示用戶點擊
+                    document.getElementById('loading').textContent = 'Click anywhere to start';
                     document.addEventListener('click', () => {
+                        video.muted = false; // 確保聲音開啟
                         video.play();
                         createHologramEffect(video);
+                        document.getElementById('loading').style.display = 'none';
                     }, { once: true });
                 });
             });
@@ -306,22 +337,44 @@
                 document.getElementById('loading').textContent = 'Video loading failed. Please try another video.';
             });
 
-            video.src = src;
+            // 設定影片來源
+            if (isObjectURL) {
+                video.src = src;
+            } else {
+                video.src = src;
+            }
+            
+            // 確保影片元素被加入到 DOM（雖然隱藏）
+            video.style.display = 'none';
+            document.body.appendChild(video);
         }
 
         // File input handler
         document.getElementById('fileInput').addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file && file.type.startsWith('video/')) {
+                document.getElementById('loading').style.display = 'block';
+                document.getElementById('loading').textContent = 'Loading video...';
                 const url = URL.createObjectURL(file);
-                setupVideo(url);
+                setupVideo(url, true);
             }
         });
 
         // Default video button
         document.getElementById('defaultVideo').addEventListener('click', () => {
-            // Using a sample video URL - replace with your video
-            setupVideo('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4');
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('loading').textContent = 'Loading video...';
+            // *** 在這裡更換預設影片 URL ***
+            // 可以使用以下任一種方式：
+            // 1. 網路影片 URL（需要支援 CORS）
+            // 2. 本地伺服器的影片路徑
+            // 3. 任何可公開訪問的影片 URL
+            
+            // 範例影片（可替換成您的影片 URL）：
+            const defaultVideoURL = 'https://raw.githubusercontent.com/isaoinvest/webAR-TEST/main/TEST%20VEDIO.mp4';
+    
+            
+            setupVideo(defaultVideoURL, false);
         });
 
         camera.position.z = 300;
@@ -349,6 +402,19 @@
 
         // Start with default video
         document.getElementById('loading').textContent = 'Click "Use Default Video" or upload your own video file';
+        
+        // Volume control
+        const volumeSlider = document.getElementById('volume');
+        const volumeValue = document.getElementById('volumeValue');
+        
+        volumeSlider.addEventListener('input', (e) => {
+            const volume = e.target.value;
+            volumeValue.textContent = volume + '%';
+            const video = document.querySelector('video');
+            if (video) {
+                video.volume = volume / 100;
+            }
+        });
     </script>
 </body>
 </html>
