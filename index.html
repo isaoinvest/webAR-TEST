@@ -175,7 +175,7 @@
         <div class="control-group">
             <input type="file" id="fileInput" accept="video/*">
             <button id="defaultVideo">Load Demo Video</button>
-            <button id="sampleVideo2">Load Tech Demo</button>
+            <button id="testSystem">Test System</button>
         </div>
         
         <div class="control-group">
@@ -364,11 +364,28 @@
             window.updateCamera = updateCamera;
         }
         
-        // Create holographic video effect
+        // Create holographic video effect with error checking
         function createHologram(videoElement) {
+            if (!videoElement || !videoTexture) {
+                console.error('Video element or texture not ready');
+                return;
+            }
+            
+            console.log('Creating hologram effect...');
+            
             // Clear previous hologram
             if (hologramGroup) {
-                hologramGroup.clear();
+                while(hologramGroup.children.length > 0) {
+                    const child = hologramGroup.children[0];
+                    if (child.geometry) child.geometry.dispose();
+                    if (child.material) {
+                        if (child.material.uniforms && child.material.uniforms.video) {
+                            child.material.uniforms.video.value.dispose();
+                        }
+                        child.material.dispose();
+                    }
+                    hologramGroup.remove(child);
+                }
             }
             
             // Video texture
@@ -696,11 +713,17 @@
             hologramGroup.add(glowMesh);
         }
         
-        // Setup video
+        // Setup video with improved error handling
         function setupVideo(src, isObjectURL = false) {
+            console.log('Setting up video:', src);
+            
+            // Clean up previous video
             if (video) {
                 video.pause();
+                video.src = '';
+                video.load();
                 video.remove();
+                video = null;
             }
             
             video = document.createElement('video');
@@ -708,28 +731,67 @@
             video.loop = true;
             video.muted = false;
             video.playsInline = true;
-            video.volume = 0.5;
+            video.volume = document.getElementById('volume').value / 100;
             video.style.display = 'none';
+            video.setAttribute('playsinline', '');
+            video.setAttribute('webkit-playsinline', '');
+            
+            // Add video to DOM first
             document.body.appendChild(video);
             
-            video.addEventListener('loadeddata', () => {
-                video.play().then(() => {
-                    createHologram(video);
-                }).catch(err => {
-                    document.getElementById('loading').textContent = 'Click to start';
-                    document.addEventListener('click', () => {
-                        video.play();
-                        createHologram(video);
-                    }, { once: true });
-                });
+            let videoLoaded = false;
+            
+            video.addEventListener('canplay', () => {
+                if (!videoLoaded) {
+                    console.log('Video can play');
+                    videoLoaded = true;
+                    
+                    // Try to play video
+                    const playPromise = video.play();
+                    
+                    if (playPromise !== undefined) {
+                        playPromise.then(() => {
+                            console.log('Video playing successfully');
+                            createHologram(video);
+                            document.getElementById('loading').style.display = 'none';
+                        }).catch(error => {
+                            console.log('Autoplay prevented:', error);
+                            // Show click to play message
+                            document.getElementById('loading').textContent = 'CLICK ANYWHERE TO START';
+                            
+                            const startVideo = () => {
+                                video.play().then(() => {
+                                    createHologram(video);
+                                    document.getElementById('loading').style.display = 'none';
+                                }).catch(err => {
+                                    console.error('Play failed:', err);
+                                });
+                                document.removeEventListener('click', startVideo);
+                            };
+                            
+                            document.addEventListener('click', startVideo);
+                        });
+                    }
+                }
             });
             
             video.addEventListener('error', (e) => {
                 console.error('Video error:', e);
-                document.getElementById('loading').textContent = 'Video loading failed';
+                const errorMessage = video.error ? video.error.message : 'Unknown error';
+                document.getElementById('loading').textContent = 'VIDEO ERROR: ' + errorMessage;
+                
+                // Try fallback video after error
+                if (!isObjectURL && src !== 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4') {
+                    console.log('Trying fallback video...');
+                    setTimeout(() => {
+                        setupVideo('https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4');
+                    }, 1000);
+                }
             });
             
+            // Set source and load
             video.src = src;
+            video.load();
         }
         
         // Animation loop
@@ -815,17 +877,81 @@
                 }
             });
             
-            // Default video buttons
+            // Default video buttons with better URLs
             document.getElementById('defaultVideo').addEventListener('click', () => {
                 document.getElementById('loading').style.display = 'block';
                 document.getElementById('loading').textContent = 'LOADING DEMO...';
-                setupVideo('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4');
+                // Using a more reliable video source
+                const videoUrl = 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4';
+                setupVideo(videoUrl);
             });
             
             document.getElementById('sampleVideo2').addEventListener('click', () => {
                 document.getElementById('loading').style.display = 'block';
                 document.getElementById('loading').textContent = 'LOADING TECH DEMO...';
-                setupVideo('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4');
+                // Alternative video source
+                const videoUrl = 'https://test-videos.co.uk/vids/sintel/mp4/h264/360/Sintel_360_10s_1MB.mp4';
+                setupVideo(videoUrl);
+            });
+            
+            // Test system button - creates a test pattern without video
+            document.getElementById('testSystem').addEventListener('click', () => {
+                document.getElementById('loading').style.display = 'block';
+                document.getElementById('loading').textContent = 'TESTING SYSTEM...';
+                
+                // Create a test video element with canvas
+                const canvas = document.createElement('canvas');
+                canvas.width = 640;
+                canvas.height = 360;
+                const ctx = canvas.getContext('2d');
+                
+                // Create animated test pattern
+                function drawTestPattern() {
+                    const time = Date.now() * 0.001;
+                    
+                    // Create gradient
+                    const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+                    gradient.addColorStop(0, `hsl(${time * 50 % 360}, 100%, 50%)`);
+                    gradient.addColorStop(0.5, `hsl(${(time * 50 + 180) % 360}, 100%, 50%)`);
+                    gradient.addColorStop(1, `hsl(${(time * 50 + 90) % 360}, 100%, 50%)`);
+                    
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    
+                    // Add some shapes
+                    ctx.fillStyle = 'white';
+                    ctx.font = '48px monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('HOLOGRAM TEST', canvas.width/2, canvas.height/2);
+                    
+                    // Add moving bars
+                    for (let i = 0; i < 10; i++) {
+                        const x = (time * 100 + i * 64) % (canvas.width + 64) - 32;
+                        ctx.fillStyle = `rgba(255, 255, 255, ${0.5 - i * 0.05})`;
+                        ctx.fillRect(x, 0, 32, canvas.height);
+                    }
+                    
+                    requestAnimationFrame(drawTestPattern);
+                }
+                
+                drawTestPattern();
+                
+                // Create video from canvas stream
+                const stream = canvas.captureStream(30);
+                const testVideo = document.createElement('video');
+                testVideo.srcObject = stream;
+                testVideo.loop = true;
+                testVideo.muted = true;
+                testVideo.play();
+                
+                // Wait a moment then create hologram
+                setTimeout(() => {
+                    videoTexture = new THREE.VideoTexture(testVideo);
+                    videoTexture.minFilter = THREE.LinearFilter;
+                    videoTexture.magFilter = THREE.LinearFilter;
+                    createHologram(testVideo);
+                    document.getElementById('loading').style.display = 'none';
+                }, 1000);
             });
             
             // Volume control
@@ -1037,65 +1163,19 @@
             window.animateBackground = animateBackground;
         }
         
-        // Initialize when DOM is ready
-        document.addEventListener('DOMContentLoaded', () => {
+        // Initialize everything when page loads
+        window.addEventListener('load', () => {
+            console.log('Initializing holographic system...');
             init();
             createBackgroundEffects();
             
             // Show initial message
             document.getElementById('loading').textContent = 'SELECT A VIDEO TO BEGIN';
             
-            // Auto-load demo after 2 seconds
-            setTimeout(() => {
-                if (!video) {
-                    document.getElementById('defaultVideo').click();
-                }
-            }, 2000);
+            // Auto-load demo after 2 seconds (optional)
+            // setTimeout(() => {
+            //     if (!video) {
+            //         document.getElementById('defaultVideo').click();
+            //     }
+            // }, 2000);
         });
-        
-        // Add to animation loop
-        function animate() {
-            requestAnimationFrame(animate);
-            
-            const time = clock.getElapsedTime();
-            
-            // Update materials
-            if (material) {
-                material.uniforms.time.value = time;
-                material.uniforms.depthScale.value = config.depth;
-                material.uniforms.scanlines.value = config.scanlines;
-                material.uniforms.glitchIntensity.value = config.glitch;
-                material.uniforms.chromaticAberration.value = config.chroma;
-                material.uniforms.distortion.value = config.effects.distortion ? 1.0 : 0.0;
-            }
-            
-            if (wireframeMaterial) {
-                wireframeMaterial.uniforms.time.value = time;
-                wireframeMaterial.uniforms.depthScale.value = config.depth;
-            }
-            
-            if (glowMaterial) {
-                glowMaterial.uniforms.time.value = time;
-            }
-            
-            // Rotate hologram
-            if (hologramGroup && config.rotation > 0) {
-                hologramGroup.rotation.y += config.rotation * 0.01;
-            }
-            
-            // Update camera
-            if (window.updateCamera) {
-                window.updateCamera();
-            }
-            
-            // Animate background
-            if (window.animateBackground) {
-                window.animateBackground();
-            }
-            
-            // Update stats
-            updateStats();
-            
-            // Render
-            renderer.render(scene, camera);
-        }
