@@ -1282,17 +1282,67 @@
             const backgroundParticles = new THREE.Points(particleGeometry, particleMaterial);
             scene.add(backgroundParticles);
             
+            // Store reference for animation
+            window.backgroundParticles = backgroundParticles;
+            
             // Animate background particles
-            function animateBackground() {
-                backgroundParticles.rotation.y += 0.0005;
-                backgroundParticles.rotation.x += 0.0002;
+            window.animateBackground = function() {
+                if (window.backgroundParticles) {
+                    window.backgroundParticles.rotation.y += 0.0005;
+                    window.backgroundParticles.rotation.x += 0.0002;
+                }
+            };
+        }
+        
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            const time = clock.getElapsedTime();
+            
+            // Update materials
+            if (material) {
+                material.uniforms.time.value = time;
+                material.uniforms.depthScale.value = config.depth;
+                material.uniforms.scanlines.value = config.scanlines;
+                material.uniforms.glitchIntensity.value = config.glitch;
+                material.uniforms.chromaticAberration.value = config.chroma;
+                material.uniforms.distortion.value = config.effects.distortion ? 1.0 : 0.0;
             }
             
-            window.animateBackground = animateBackground;
+            if (wireframeMaterial) {
+                wireframeMaterial.uniforms.time.value = time;
+                wireframeMaterial.uniforms.depthScale.value = config.depth;
+            }
+            
+            if (glowMaterial) {
+                glowMaterial.uniforms.time.value = time;
+            }
+            
+            // Rotate hologram
+            if (hologramGroup && config.rotation > 0) {
+                hologramGroup.rotation.y += config.rotation * 0.01;
+            }
+            
+            // Update camera
+            if (window.updateCamera) {
+                window.updateCamera();
+            }
+            
+            // Animate background
+            if (window.animateBackground) {
+                window.animateBackground();
+            }
+            
+            // Update stats
+            updateStats();
+            
+            // Render
+            renderer.render(scene, camera);
         }
         
         // Initialize everything when page loads
-        window.addEventListener('load', () => {
+        window.addEventListener('DOMContentLoaded', () => {
             console.log('Initializing holographic system...');
             
             try {
