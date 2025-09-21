@@ -18,7 +18,6 @@
         let animationPhase = 0;
         let time = 0;
         let canvas;
-        let pg; // 離屏緩衝區
         
         // 粒子系統類別
         class Particle {
@@ -153,25 +152,35 @@
         }
         
         function setup() {
+            // 創建canvas並設定為全域變數
             canvas = createCanvas(512, 512);
-            canvas.parent('canvas-ar');
             
-            // 創建離屏緩衝區用於更好的性能
-            pg = createGraphics(width, height);
+            // 等待DOM載入完成後再掛載canvas
+            if (document.getElementById('canvas-container')) {
+                canvas.parent('canvas-container');
+            } else {
+                // 如果容器還沒準備好，創建一個
+                let container = document.createElement('div');
+                container.id = 'canvas-container';
+                container.style.display = 'none';
+                document.body.appendChild(container);
+                canvas.parent('canvas-container');
+            }
             
             colorMode(HSB, 360, 100, 100, 100);
             
             // 監聽目標檢測事件
             document.addEventListener('targetFound', handleTargetFound);
             document.addEventListener('targetLost', handleTargetLost);
+            
+            console.log('P5.js setup complete');
         }
         
         function draw() {
             time += 0.016; // 假設 60fps
             
-            // 清除畫布
+            // 清除畫布 - 使用透明背景
             clear();
-            background(0, 0, 0, 0);
             
             if (targetFound) {
                 // 創建新粒子
@@ -196,13 +205,11 @@
             // 漸入動畫
             if (targetFound && animationPhase < 1) {
                 animationPhase += 0.02;
-                tint(255, map(animationPhase, 0, 1, 0, 255));
             }
             
             // 漸出動畫
             if (targetLost) {
                 animationPhase -= 0.05;
-                tint(255, map(animationPhase, 0, 1, 0, 255));
                 if (animationPhase <= 0) {
                     targetLost = false;
                     particles = [];
@@ -216,7 +223,6 @@
             let centerY = height / 2;
             
             // 這裡可以根據實際的目標圖片類型來調整
-            // 假設我們有三種不同的目標圖片
             let targetType = Math.floor(time / 10) % 3; // 循環切換效果類型
             
             switch(targetType) {
@@ -254,20 +260,21 @@
             colorMode(HSB, 360, 100, 100, 100);
             
             // 漸變背景
-            for (let y = 0; y < height; y += 2) {
-                let alpha = map(sin(y * 0.01 + time), -1, 1, 5, 15);
+            for (let y = 0; y < height; y += 4) {
+                let alpha = map(sin(y * 0.01 + time), -1, 1, 2, 8);
                 let hue = (time * 20 + y * 0.1) % 360;
                 stroke(hue, 40, 20, alpha);
+                strokeWeight(1);
                 line(0, y, width, y);
             }
             
             // 添加一些背景粒子
-            fill(0, 0, 100, 10);
+            fill(0, 0, 100, 8);
             noStroke();
-            for (let i = 0; i < 20; i++) {
-                let x = (noise(i * 0.1, time * 0.1) * width);
-                let y = (noise(i * 0.1 + 100, time * 0.1) * height);
-                let size = noise(i * 0.1 + 200, time * 0.1) * 3;
+            for (let i = 0; i < 15; i++) {
+                let x = (noise(i * 0.1, time * 0.05) * width);
+                let y = (noise(i * 0.1 + 100, time * 0.05) * height);
+                let size = noise(i * 0.1 + 200, time * 0.05) * 2 + 1;
                 circle(x, y, size);
             }
             
@@ -293,21 +300,51 @@
         AFRAME.registerComponent('canvas-updater', {
             dependencies: ['geometry', 'material'],
             
+            init: function() {
+                console.log('Canvas updater initialized');
+                this.needsUpdate = true;
+            },
+            
             tick: function () {
-                var material = this.el.getObject3D('mesh').material;
-                if (!material.map) { return; }
-                material.map.needsUpdate = true;
+                if (!this.needsUpdate) return;
+                
+                var mesh = this.el.getObject3D('mesh');
+                if (!mesh || !mesh.material) return;
+                
+                var material = mesh.material;
+                
+                // 確保P5.js canvas存在且可用
+                var canvasElement = document.querySelector('#canvas-container canvas');
+                if (!canvasElement) return;
+                
+                // 創建或更新紋理
+                if (!material.map || this.lastCanvas !== canvasElement) {
+                    if (typeof THREE !== 'undefined') {
+                        material.map = new THREE.CanvasTexture(canvasElement);
+                        material.map.minFilter = THREE.LinearFilter;
+                        material.map.magFilter = THREE.LinearFilter;
+                        material.needsUpdate = true;
+                        this.lastCanvas = canvasElement;
+                        console.log('Canvas texture created/updated');
+                    }
+                } else if (material.map) {
+                    material.map.needsUpdate = true;
+                }
             }
         });
         
         // 目標檢測事件處理
         AFRAME.registerComponent('target-handler', {
             init: function () {
+                console.log('Target handler initialized');
+                
                 this.el.addEventListener('targetFound', function () {
+                    console.log('MindAR target found event');
                     document.dispatchEvent(new CustomEvent('targetFound'));
                 });
                 
                 this.el.addEventListener('targetLost', function () {
+                    console.log('MindAR target lost event');
                     document.dispatchEvent(new CustomEvent('targetLost'));
                 });
             }
@@ -327,8 +364,11 @@
             overflow: hidden;
         }
         
-        #canvas-ar {
+        #canvas-container {
             display: none;
+            position: absolute;
+            top: -9999px;
+            left: -9999px;
         }
         
         /* 載入動畫 */
@@ -340,6 +380,9 @@
             color: white;
             font-size: 18px;
             z-index: 1000;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 10px;
         }
         
         /* 提示文字 */
@@ -365,8 +408,8 @@
 </head>
 
 <body>
-    <!-- P5.js 畫布 -->
-    <div id="canvas-ar"></div>
+    <!-- P5.js 畫布容器 -->
+    <div id="canvas-container"></div>
     
     <!-- 載入提示 -->
     <div class="loading" id="loadingText">正在初始化 AR...</div>
@@ -383,7 +426,8 @@
         renderer="colorManagement: true, physicallyCorrectLights"
         vr-mode-ui="enabled: false" 
         device-orientation-permission-ui="enabled: false"
-        loading-screen="enabled: false">
+        loading-screen="enabled: false"
+        embedded>
         
         <a-camera 
             position="0 0 0" 
@@ -403,7 +447,7 @@
                 position="0 0 0" 
                 scale="1.1 1.1 1.1"
                 rotation="0 0 0" 
-                material="src:#canvas-ar; transparent: true; alphaTest: 0.1; side: double;"
+                material="transparent: true; alphaTest: 0.1; side: double;"
                 canvas-updater>
             </a-plane>
         </a-entity>
@@ -411,8 +455,14 @@
 
     <!-- 初始化腳本 -->
     <script>
-        // 隱藏載入文字當場景準備好時
+        // 場景載入完成事件
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM Content Loaded');
+        });
+        
+        // A-Frame場景載入完成
         document.querySelector('a-scene').addEventListener('loaded', function () {
+            console.log('A-Frame scene loaded');
             document.getElementById('loadingText').style.display = 'none';
         });
         
@@ -420,6 +470,11 @@
         if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
             console.log('Mobile device detected - optimizing performance');
         }
+        
+        // 錯誤處理
+        window.addEventListener('error', function(e) {
+            console.error('JavaScript Error:', e.error);
+        });
     </script>
 </body>
 </html>
