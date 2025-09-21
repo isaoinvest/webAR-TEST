@@ -1,592 +1,425 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-TW">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Ultra Cool AR P5.js Experience</title>
-
-    <!-- Load Libraries -->
+    <title>Modern P5.js AR Experience</title>
+    
+    <!-- 載入 A-Frame + MindAR + p5.js -->
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.3/dist/mindar-image-aframe.prod.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
-
-    <!-- P5.js Sketch -->
+    
+    <!-- P5.js 主要程式 -->
     <script>
         let particles = [];
-        let attractors = [];
-        let colorPalette;
+        let targetFound = false;
+        let targetLost = false;
+        let animationPhase = 0;
         let time = 0;
-        let waveAmplitude = 0;
-        let targetDetected = false;
-        let morphProgress = 0;
-        let circleWaves = [];
-        let flowField = [];
-        let flowFieldCols, flowFieldRows;
-        let flowFieldScale = 20;
-
-        function setup() {
-            let canvas = createCanvas(800, 1129, document.getElementById('canvas-ar'));
-            
-            // Dynamic color palette
-            colorPalette = [
-                color(255, 100, 150, 200),  // Neon pink
-                color(100, 255, 255, 200),  // Cyan
-                color(255, 255, 100, 200),  // Yellow
-                color(150, 100, 255, 200),  // Purple
-                color(100, 255, 150, 200)   // Mint
-            ];
-            
-            // Initialize particle system
-            for (let i = 0; i < 150; i++) {
-                particles.push(new Particle(random(width), random(height)));
-            }
-            
-            // Initialize circular wave system
-            for (let i = 0; i < 5; i++) {
-                circleWaves.push({
-                    x: width/2,
-                    y: height/2,
-                    radius: i * 100,
-                    phase: i * PI/5,
-                    color: random(colorPalette)
-                });
-            }
-            
-            // Initialize flow field
-            flowFieldCols = floor(width / flowFieldScale);
-            flowFieldRows = floor(height / flowFieldScale);
-            generateFlowField();
-            
-            // Create circular attractors
-            let numAttractors = 8;
-            for (let i = 0; i < numAttractors; i++) {
-                let angle = (TWO_PI / numAttractors) * i;
-                let x = width/2 + cos(angle) * 200;
-                let y = height/2 + sin(angle) * 200;
-                attractors.push(createVector(x, y));
-            }
-        }
-
-        function draw() {
-            // Dynamic gradient background
-            drawGradientBackground();
-            
-            time += 0.02;
-            waveAmplitude = sin(time) * 50;
-            
-            // Smooth morph animation
-            if (targetDetected) {
-                morphProgress = min(morphProgress + 0.03, 1);
-            } else {
-                morphProgress = max(morphProgress - 0.03, 0);
-            }
-            
-            // Draw flow field visualization
-            if (morphProgress > 0.5) {
-                drawFlowField();
-            }
-            
-            // Draw morphing circular waves
-            push();
-            translate(width/2, height/2);
-            for (let wave of circleWaves) {
-                drawMorphingCircle(wave);
-            }
-            pop();
-            
-            // Update and draw particle system
-            for (let particle of particles) {
-                particle.followField(flowField);
-                particle.update(attractors, morphProgress);
-                particle.display();
-            }
-            
-            // Central pulsing orb
-            drawCentralOrb();
-            
-            // Draw connecting lines between nearby particles
-            drawConnections();
-            
-            // Add glowing text overlay
-            if (morphProgress > 0.8) {
-                drawGlowingText();
-            }
-        }
-
-        function drawGradientBackground() {
-            for (let i = 0; i <= height; i++) {
-                let inter = map(i, 0, height, 0, 1);
-                let c = lerpColor(
-                    color(10, 10, 30 + sin(time) * 20),
-                    color(50 + sin(time + PI) * 30, 10, 80),
-                    inter
-                );
-                stroke(c);
-                line(0, i, width, i);
-            }
-        }
-
-        function drawMorphingCircle(wave) {
-            push();
-            noFill();
-            strokeWeight(2);
-            
-            let morphedRadius = wave.radius + sin(time * 2 + wave.phase) * waveAmplitude;
-            
-            beginShape();
-            for (let angle = 0; angle < TWO_PI; angle += 0.1) {
-                let distortion = noise(cos(angle) * 2, sin(angle) * 2, time) * 50 * morphProgress;
-                let r = morphedRadius + distortion;
-                let x = cos(angle) * r;
-                let y = sin(angle) * r;
-                
-                // Apply wave distortion
-                x += sin(angle * 5 + time * 3) * 10 * morphProgress;
-                y += cos(angle * 5 + time * 3) * 10 * morphProgress;
-                
-                let alpha = map(sin(time + wave.phase), -1, 1, 50, 255);
-                stroke(red(wave.color), green(wave.color), blue(wave.color), alpha);
-                vertex(x, y);
-            }
-            endShape(CLOSE);
-            pop();
-        }
-
-        function drawCentralOrb() {
-            push();
-            translate(width/2, height/2);
-            
-            // Outer glow
-            for (let i = 5; i > 0; i--) {
-                let alpha = map(i, 0, 5, 100, 0);
-                fill(150, 100, 255, alpha * morphProgress);
-                noStroke();
-                let size = 100 + i * 20 + sin(time * 2) * 10;
-                ellipse(0, 0, size, size);
-            }
-            
-            // Inner core
-            fill(255, 255, 255, 200);
-            let coreSize = 50 + sin(time * 3) * 10;
-            ellipse(0, 0, coreSize * morphProgress, coreSize * morphProgress);
-            
-            // Rotating rings
-            strokeWeight(2);
-            noFill();
-            for (let i = 0; i < 3; i++) {
-                push();
-                rotate(time + i * PI/3);
-                stroke(colorPalette[i % colorPalette.length]);
-                let ringSize = 80 + i * 30;
-                ellipse(0, 0, ringSize * morphProgress, ringSize * morphProgress * 0.6);
-                pop();
-            }
-            pop();
-        }
-
-        function drawConnections() {
-            strokeWeight(0.5);
-            for (let i = 0; i < particles.length; i++) {
-                for (let j = i + 1; j < particles.length; j++) {
-                    let d = dist(particles[i].pos.x, particles[i].pos.y, 
-                               particles[j].pos.x, particles[j].pos.y);
-                    if (d < 100) {
-                        let alpha = map(d, 0, 100, 100, 0);
-                        stroke(100, 255, 255, alpha * morphProgress);
-                        line(particles[i].pos.x, particles[i].pos.y,
-                             particles[j].pos.x, particles[j].pos.y);
-                    }
-                }
-            }
-        }
-
-        function drawGlowingText() {
-            push();
-            textAlign(CENTER, CENTER);
-            textSize(48);
-            
-            // Text glow effect
-            for (let i = 5; i > 0; i--) {
-                let alpha = map(i, 0, 5, 255, 0);
-                fill(255, 100, 200, alpha * 0.3);
-                text("REALITY ENHANCED", width/2, height/4);
-            }
-            
-            fill(255, 255, 255);
-            text("REALITY ENHANCED", width/2, height/4);
-            
-            textSize(24);
-            let pulse = sin(time * 4) * 0.2 + 0.8;
-            fill(100, 255, 255, 255 * pulse);
-            text("Circle Target Detected", width/2, height/4 + 60);
-            pop();
-        }
-
-        function generateFlowField() {
-            let xoff = 0;
-            for (let i = 0; i < flowFieldCols; i++) {
-                let yoff = 0;
-                flowField[i] = [];
-                for (let j = 0; j < flowFieldRows; j++) {
-                    let angle = noise(xoff, yoff, time * 0.1) * TWO_PI * 2;
-                    flowField[i][j] = p5.Vector.fromAngle(angle);
-                    yoff += 0.1;
-                }
-                xoff += 0.1;
-            }
-        }
-
-        function drawFlowField() {
-            strokeWeight(1);
-            for (let i = 0; i < flowFieldCols; i += 2) {
-                for (let j = 0; j < flowFieldRows; j += 2) {
-                    let x = i * flowFieldScale;
-                    let y = j * flowFieldScale;
-                    let v = flowField[i][j];
-                    
-                    push();
-                    translate(x, y);
-                    stroke(255, 50, 150, 50);
-                    rotate(v.heading());
-                    line(0, 0, flowFieldScale * 0.5, 0);
-                    pop();
-                }
-            }
-        }
-
-        // Particle class
+        let canvas;
+        let pg; // 離屏緩衝區
+        
+        // 粒子系統類別
         class Particle {
-            constructor(x, y) {
+            constructor(x, y, type = 'firework') {
                 this.pos = createVector(x, y);
-                this.vel = createVector(random(-2, 2), random(-2, 2));
-                this.acc = createVector(0, 0);
-                this.maxSpeed = 4;
-                this.color = random(colorPalette);
-                this.size = random(3, 8);
-                this.lifespan = 255;
+                this.vel = createVector();
+                this.acc = createVector();
+                this.life = 255;
+                this.maxLife = 255;
+                this.size = random(2, 6);
+                this.type = type;
+                this.hue = random(360);
                 this.trail = [];
-                this.maxTrailLength = 10;
-            }
-            
-            followField(field) {
-                let x = floor(this.pos.x / flowFieldScale);
-                let y = floor(this.pos.y / flowFieldScale);
+                this.maxTrail = 10;
                 
-                if (x >= 0 && x < flowFieldCols && y >= 0 && y < flowFieldRows) {
-                    let force = field[x][y];
-                    this.applyForce(force);
+                // 根據類型設定不同的初始速度
+                switch(type) {
+                    case 'firework':
+                        this.vel = p5.Vector.random2D().mult(random(2, 8));
+                        this.gravity = createVector(0, 0.05);
+                        break;
+                    case 'flower':
+                        let angle = random(TWO_PI);
+                        this.vel = createVector(cos(angle), sin(angle)).mult(random(1, 3));
+                        this.rotSpeed = random(-0.1, 0.1);
+                        this.rotation = 0;
+                        break;
+                    case 'star':
+                        this.vel = p5.Vector.random2D().mult(random(0.5, 2));
+                        this.twinkle = random(TWO_PI);
+                        break;
                 }
             }
             
-            applyForce(force) {
-                this.acc.add(force);
-            }
-            
-            update(attractors, morph) {
-                // Add trail point
-                this.trail.push(createVector(this.pos.x, this.pos.y));
-                if (this.trail.length > this.maxTrailLength) {
+            update() {
+                // 更新軌跡
+                this.trail.push(this.pos.copy());
+                if (this.trail.length > this.maxTrail) {
                     this.trail.shift();
                 }
                 
-                // Apply attraction to circular points
-                for (let attractor of attractors) {
-                    let force = p5.Vector.sub(attractor, this.pos);
-                    let d = force.mag();
-                    d = constrain(d, 5, 200);
-                    let strength = (morph * 20) / (d * d);
-                    force.setMag(strength);
-                    this.applyForce(force);
+                // 根據類型更新物理
+                switch(this.type) {
+                    case 'firework':
+                        this.acc.add(this.gravity);
+                        break;
+                    case 'flower':
+                        this.rotation += this.rotSpeed;
+                        // 花瓣式運動
+                        let force = p5.Vector.fromAngle(this.rotation * 3).mult(0.02);
+                        this.acc.add(force);
+                        break;
+                    case 'star':
+                        this.twinkle += 0.1;
+                        // 星星閃爍效果
+                        this.size = 3 + sin(this.twinkle) * 2;
+                        break;
                 }
-                
-                // Add some randomness
-                let randomForce = createVector(random(-0.5, 0.5), random(-0.5, 0.5));
-                this.applyForce(randomForce);
                 
                 this.vel.add(this.acc);
-                this.vel.limit(this.maxSpeed);
                 this.pos.add(this.vel);
                 this.acc.mult(0);
-                
-                // Wrap edges
-                if (this.pos.x < 0) this.pos.x = width;
-                if (this.pos.x > width) this.pos.x = 0;
-                if (this.pos.y < 0) this.pos.y = height;
-                if (this.pos.y > height) this.pos.y = 0;
-                
-                // Regenerate if needed
-                this.lifespan -= 0.5;
-                if (this.lifespan < 0) {
-                    this.respawn();
-                }
+                this.life -= 2;
             }
             
             display() {
-                // Draw trail
+                push();
+                colorMode(HSB, 360, 100, 100, 100);
+                
+                // 繪製軌跡
                 noFill();
-                strokeWeight(1);
                 for (let i = 0; i < this.trail.length - 1; i++) {
-                    let alpha = map(i, 0, this.trail.length, 0, 100);
-                    stroke(red(this.color), green(this.color), blue(this.color), alpha);
-                    line(this.trail[i].x, this.trail[i].y, 
-                         this.trail[i + 1].x, this.trail[i + 1].y);
+                    let alpha = map(i, 0, this.trail.length - 1, 0, this.life / 2.55);
+                    stroke(this.hue, 80, 90, alpha);
+                    strokeWeight(map(i, 0, this.trail.length - 1, 1, 3));
+                    line(this.trail[i].x, this.trail[i].y, this.trail[i + 1].x, this.trail[i + 1].y);
                 }
                 
-                // Draw particle with glow
-                push();
-                drawingContext.shadowBlur = 20;
-                drawingContext.shadowColor = this.color.toString();
+                // 繪製主體
+                translate(this.pos.x, this.pos.y);
                 
-                fill(this.color);
-                noStroke();
-                let adjustedSize = this.size * (1 + sin(time * 3) * 0.2);
-                ellipse(this.pos.x, this.pos.y, adjustedSize, adjustedSize);
+                switch(this.type) {
+                    case 'firework':
+                        // 煙火效果
+                        fill(this.hue, 100, 100, this.life / 2.55);
+                        noStroke();
+                        circle(0, 0, this.size);
+                        
+                        // 外圈光暈
+                        fill(this.hue, 60, 100, this.life / 5.1);
+                        circle(0, 0, this.size * 2);
+                        break;
+                        
+                    case 'flower':
+                        // 花瓣效果
+                        rotate(this.rotation);
+                        fill(this.hue, 70, 90, this.life / 2.55);
+                        noStroke();
+                        
+                        // 繪製花瓣
+                        for (let i = 0; i < 6; i++) {
+                            rotate(PI / 3);
+                            ellipse(0, -this.size, this.size * 0.8, this.size * 2);
+                        }
+                        break;
+                        
+                    case 'star':
+                        // 星星效果
+                        rotate(this.rotation);
+                        fill(this.hue, 80, 100, this.life / 2.55);
+                        noStroke();
+                        
+                        // 繪製星形
+                        beginShape();
+                        for (let i = 0; i < 10; i++) {
+                            let angle = map(i, 0, 10, 0, TWO_PI);
+                            let r = (i % 2 === 0) ? this.size : this.size * 0.5;
+                            let x = cos(angle) * r;
+                            let y = sin(angle) * r;
+                            vertex(x, y);
+                        }
+                        endShape(CLOSE);
+                        break;
+                }
+                
                 pop();
             }
             
-            respawn() {
-                this.pos = createVector(random(width), random(height));
-                this.vel = createVector(random(-2, 2), random(-2, 2));
-                this.lifespan = 255;
-                this.trail = [];
+            isDead() {
+                return this.life <= 0;
             }
         }
-
-        // Listen for AR target detection
-        window.addEventListener('targetFound', () => {
-            targetDetected = true;
-            // Regenerate flow field on detection
-            generateFlowField();
-        });
-
-        window.addEventListener('targetLost', () => {
-            targetDetected = false;
-        });
+        
+        function setup() {
+            canvas = createCanvas(512, 512);
+            canvas.parent('canvas-ar');
+            
+            // 創建離屏緩衝區用於更好的性能
+            pg = createGraphics(width, height);
+            
+            colorMode(HSB, 360, 100, 100, 100);
+            
+            // 監聽目標檢測事件
+            document.addEventListener('targetFound', handleTargetFound);
+            document.addEventListener('targetLost', handleTargetLost);
+        }
+        
+        function draw() {
+            time += 0.016; // 假設 60fps
+            
+            // 清除畫布
+            clear();
+            background(0, 0, 0, 0);
+            
+            if (targetFound) {
+                // 創建新粒子
+                if (frameCount % 3 === 0) { // 每3幀創建新粒子
+                    createParticlesBasedOnTarget();
+                }
+                
+                // 背景效果
+                drawBackground();
+            }
+            
+            // 更新和繪製粒子
+            for (let i = particles.length - 1; i >= 0; i--) {
+                particles[i].update();
+                particles[i].display();
+                
+                if (particles[i].isDead()) {
+                    particles.splice(i, 1);
+                }
+            }
+            
+            // 漸入動畫
+            if (targetFound && animationPhase < 1) {
+                animationPhase += 0.02;
+                tint(255, map(animationPhase, 0, 1, 0, 255));
+            }
+            
+            // 漸出動畫
+            if (targetLost) {
+                animationPhase -= 0.05;
+                tint(255, map(animationPhase, 0, 1, 0, 255));
+                if (animationPhase <= 0) {
+                    targetLost = false;
+                    particles = [];
+                }
+            }
+        }
+        
+        function createParticlesBasedOnTarget() {
+            // 根據目標類型創建不同效果
+            let centerX = width / 2;
+            let centerY = height / 2;
+            
+            // 這裡可以根據實際的目標圖片類型來調整
+            // 假設我們有三種不同的目標圖片
+            let targetType = Math.floor(time / 10) % 3; // 循環切換效果類型
+            
+            switch(targetType) {
+                case 0: // 煙火效果
+                    for (let i = 0; i < 3; i++) {
+                        let x = centerX + random(-50, 50);
+                        let y = centerY + random(-50, 50);
+                        particles.push(new Particle(x, y, 'firework'));
+                    }
+                    break;
+                    
+                case 1: // 花朵效果
+                    let flowerCount = 2;
+                    for (let i = 0; i < flowerCount; i++) {
+                        let angle = (TWO_PI / flowerCount) * i + time * 0.5;
+                        let x = centerX + cos(angle) * 30;
+                        let y = centerY + sin(angle) * 30;
+                        particles.push(new Particle(x, y, 'flower'));
+                    }
+                    break;
+                    
+                case 2: // 星際效果
+                    for (let i = 0; i < 2; i++) {
+                        let x = centerX + random(-80, 80);
+                        let y = centerY + random(-80, 80);
+                        particles.push(new Particle(x, y, 'star'));
+                    }
+                    break;
+            }
+        }
+        
+        function drawBackground() {
+            // 動態背景效果
+            push();
+            colorMode(HSB, 360, 100, 100, 100);
+            
+            // 漸變背景
+            for (let y = 0; y < height; y += 2) {
+                let alpha = map(sin(y * 0.01 + time), -1, 1, 5, 15);
+                let hue = (time * 20 + y * 0.1) % 360;
+                stroke(hue, 40, 20, alpha);
+                line(0, y, width, y);
+            }
+            
+            // 添加一些背景粒子
+            fill(0, 0, 100, 10);
+            noStroke();
+            for (let i = 0; i < 20; i++) {
+                let x = (noise(i * 0.1, time * 0.1) * width);
+                let y = (noise(i * 0.1 + 100, time * 0.1) * height);
+                let size = noise(i * 0.1 + 200, time * 0.1) * 3;
+                circle(x, y, size);
+            }
+            
+            pop();
+        }
+        
+        function handleTargetFound() {
+            console.log('Target found!');
+            targetFound = true;
+            targetLost = false;
+            animationPhase = 0;
+        }
+        
+        function handleTargetLost() {
+            console.log('Target lost!');
+            targetFound = false;
+            targetLost = true;
+        }
     </script>
 
-    <!-- A-Frame Component -->
-    <script>
+    <!-- A-Frame 畫布更新器組件 -->
+    <script type="text/javascript">
         AFRAME.registerComponent('canvas-updater', {
             dependencies: ['geometry', 'material'],
+            
             tick: function () {
-                var material, el = this.el;
-                material = el.getObject3D('mesh').material;
+                var material = this.el.getObject3D('mesh').material;
                 if (!material.map) { return; }
                 material.map.needsUpdate = true;
             }
         });
-
-        // Custom target detection events
-        AFRAME.registerComponent('target-events', {
+        
+        // 目標檢測事件處理
+        AFRAME.registerComponent('target-handler', {
             init: function () {
-                this.el.addEventListener('targetFound', () => {
-                    window.dispatchEvent(new Event('targetFound'));
+                this.el.addEventListener('targetFound', function () {
+                    document.dispatchEvent(new CustomEvent('targetFound'));
                 });
-                this.el.addEventListener('targetLost', () => {
-                    window.dispatchEvent(new Event('targetLost'));
+                
+                this.el.addEventListener('targetLost', function () {
+                    document.dispatchEvent(new CustomEvent('targetLost'));
                 });
             }
         });
     </script>
 
-    <style>
+    <style type="text/css">
         body {
             margin: 0;
             padding: 0;
-            overflow: hidden;
-            background: linear-gradient(135deg, #0a0a0a 0%, #1a0033 100%);
+            background: #000;
             font-family: 'Arial', sans-serif;
             -webkit-user-select: none;
+            -moz-user-select: none;
             -ms-user-select: none;
             user-select: none;
+            overflow: hidden;
         }
-
+        
         #canvas-ar {
             display: none;
         }
-
-        .loading-screen {
+        
+        /* 載入動畫 */
+        .loading {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 9999;
-            animation: fadeOut 2s forwards;
-            animation-delay: 1s;
-        }
-
-        .loading-text {
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
             color: white;
-            font-size: 24px;
-            font-weight: bold;
-            margin-bottom: 20px;
-            text-shadow: 0 0 20px rgba(255,255,255,0.5);
+            font-size: 18px;
+            z-index: 1000;
         }
-
-        .pulse-ring {
-            width: 100px;
-            height: 100px;
-            border: 3px solid rgba(255,255,255,0.5);
-            border-radius: 50%;
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0% {
-                transform: scale(0.8);
-                opacity: 1;
-            }
-            50% {
-                transform: scale(1.2);
-                opacity: 0.5;
-            }
-            100% {
-                transform: scale(0.8);
-                opacity: 1;
-            }
-        }
-
-        @keyframes fadeOut {
-            to {
-                opacity: 0;
-                visibility: hidden;
-            }
-        }
-
-        .info-panel {
+        
+        /* 提示文字 */
+        .instruction {
             position: fixed;
-            top: 20px;
-            left: 20px;
-            background: rgba(0, 0, 0, 0.7);
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
             color: white;
-            padding: 15px;
-            border-radius: 10px;
-            backdrop-filter: blur(10px);
-            z-index: 100;
-            max-width: 300px;
-        }
-
-        .info-panel h3 {
-            margin: 0 0 10px 0;
-            color: #00ffff;
-            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
-        }
-
-        .info-panel p {
-            margin: 5px 0;
-            font-size: 14px;
-            line-height: 1.5;
-        }
-
-        .glow-button {
-            position: fixed;
-            bottom: 30px;
-            right: 30px;
-            padding: 12px 24px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
+            background: rgba(0,0,0,0.7);
+            padding: 10px 20px;
             border-radius: 25px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-            transition: all 0.3s ease;
-            z-index: 100;
+            font-size: 14px;
+            text-align: center;
+            z-index: 1000;
         }
-
-        .glow-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        
+        a-scene {
+            height: 100vh;
+            width: 100vw;
         }
     </style>
 </head>
 
 <body>
-    <!-- Loading Screen -->
-    <div class="loading-screen">
-        <div class="loading-text">Initializing AR Experience</div>
-        <div class="pulse-ring"></div>
+    <!-- P5.js 畫布 -->
+    <div id="canvas-ar"></div>
+    
+    <!-- 載入提示 -->
+    <div class="loading" id="loadingText">正在初始化 AR...</div>
+    
+    <!-- 使用提示 -->
+    <div class="instruction">
+        將相機對準目標圖片以觸發 AR 效果
     </div>
-
-    <!-- Info Panel -->
-    <div class="info-panel">
-        <h3>🎯 AR Circle Tracker</h3>
-        <p>📱 Point your camera at a circular target image</p>
-        <p>✨ Watch the magic happen when detected</p>
-        <p>🎨 Interactive particle system with flow fields</p>
-    </div>
-
-    <!-- Reset Button -->
-    <button class="glow-button" onclick="location.reload()">Reset Experience</button>
-
-    <!-- P5.js Canvas -->
-    <canvas id="canvas-ar"></canvas>
-
-    <!-- A-Frame AR Scene -->
+    
+    <!-- MindAR + A-Frame AR 場景 -->
     <a-scene 
-        mindar-image="imageTargetSrc: targets.mind; filterMinCF:0.0001; filterBeta: 0.01; warmupTolerance: 5; missTolerance: 5;" 
+        mindar-image="imageTargetSrc: data/targets.mind; filterMinCF:0.0005; filterBeta: .1; warmupTolerance: 5; missTolerance: 5"
+        color-space="sRGB" 
+        renderer="colorManagement: true, physicallyCorrectLights"
         vr-mode-ui="enabled: false" 
         device-orientation-permission-ui="enabled: false"
-        color-space="sRGB"
-        renderer="colorManagement: true; physicallyCorrectLights: true;">
+        loading-screen="enabled: false">
         
-        <!-- Camera -->
         <a-camera 
             position="0 0 0" 
             look-controls="enabled: false"
             cursor="fuse: false; rayOrigin: mouse;">
         </a-camera>
-
-        <!-- AR Target 1 - Main circular target -->
+        
         <a-entity 
-            id="target-1" 
+            id="example-target" 
             mindar-image-target="targetIndex: 0"
-            target-events>
+            target-handler>
             
-            <!-- P5.js Canvas Plane -->
+            <!-- P5.js 畫布作為材質的平面，調整為標準海報比例 -->
             <a-plane 
                 width="1" 
                 height="1.4145" 
                 position="0 0 0" 
-                scale="1.1 1.1 1.1" 
+                scale="1.1 1.1 1.1"
                 rotation="0 0 0" 
-                material="src:#canvas-ar; transparent: true; opacity: 0.95; side: double;" 
-                canvas-updater
-                animation="property: rotation; to: 0 360 0; dur: 30000; loop: true; easing: linear;">
+                material="src:#canvas-ar; transparent: true; alphaTest: 0.1; side: double;"
+                canvas-updater>
             </a-plane>
-
-            <!-- Additional decorative elements -->
-            <a-ring 
-                color="#00ffff" 
-                radius-inner="0.8" 
-                radius-outer="0.85"
-                position="0 0 -0.01"
-                animation="property: rotation; to: 0 0 360; dur: 10000; loop: true; easing: linear;"
-                material="opacity: 0.5; side: double;">
-            </a-ring>
-
-            <a-ring 
-                color="#ff00ff" 
-                radius-inner="0.9" 
-                radius-outer="0.95"
-                position="0 0 -0.02"
-                animation="property: rotation; to: 0 0 -360; dur: 15000; loop: true; easing: linear;"
-                material="opacity: 0.3; side: double;">
-            </a-ring>
         </a-entity>
-
-        <!-- You can add more targets here -->
-        <!-- <a-entity id="target-2" mindar-image-target="targetIndex: 1" target-events>
-            ... custom content for second target ...
-        </a-entity> -->
-
     </a-scene>
+
+    <!-- 初始化腳本 -->
+    <script>
+        // 隱藏載入文字當場景準備好時
+        document.querySelector('a-scene').addEventListener('loaded', function () {
+            document.getElementById('loadingText').style.display = 'none';
+        });
+        
+        // 性能優化：限制幀率在移動設備上
+        if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+            console.log('Mobile device detected - optimizing performance');
+        }
+    </script>
 </body>
 </html>
