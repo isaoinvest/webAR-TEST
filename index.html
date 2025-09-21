@@ -1,2481 +1,592 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>Advanced Holographic Video System v2.0</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body { 
-            background: #000;
-            overflow: hidden;
-            font-family: 'Courier New', monospace;
-            cursor: crosshair;
-        }
-        
-        canvas { 
-            display: block;
-            filter: contrast(1.2) brightness(1.1);
-        }
-        
-        #loading {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: #00ffff;
-            font-size: 24px;
-            z-index: 100;
-            text-shadow: 0 0 20px #00ffff;
-            animation: pulse 1.5s infinite;
-            text-align: center;
-        }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-        
-        /* Toggle Button for Control Panel */
-        #togglePanel {
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            z-index: 101;
-            width: 50px;
-            height: 50px;
-            background: linear-gradient(135deg, rgba(0,255,255,0.2), rgba(0,136,255,0.2));
-            border: 2px solid #00ffff;
-            border-radius: 50%;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.3s;
-            backdrop-filter: blur(10px);
-        }
-        
-        #togglePanel:hover {
-            transform: scale(1.1);
-            box-shadow: 0 0 30px rgba(0,255,255,0.5);
-        }
-        
-        #togglePanel::before {
-            content: '☰';
-            color: #00ffff;
-            font-size: 24px;
-            text-shadow: 0 0 10px #00ffff;
-        }
-        
-        #togglePanel.active::before {
-            content: '✕';
-        }
-        
-        /* Control Panel - Initially Hidden */
-        #controlPanel {
-            position: fixed;
-            top: 80px;
-            left: -380px; /* Hidden initially */
-            z-index: 100;
-            background: linear-gradient(135deg, rgba(0,20,40,0.95), rgba(0,40,80,0.95));
-            border: 1px solid #00ffff;
-            border-radius: 10px;
-            padding: 20px;
-            color: #00ffff;
-            box-shadow: 0 0 30px rgba(0,255,255,0.3);
-            backdrop-filter: blur(10px);
-            width: 350px;
-            transition: left 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-            max-height: calc(100vh - 100px);
-            overflow-y: auto;
-        }
-        
-        #controlPanel.visible {
-            left: 20px;
-        }
-        
-        #controlPanel h3 {
-            margin-bottom: 15px;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            font-size: 14px;
-            text-shadow: 0 0 10px #00ffff;
-        }
-        
-        /* Quick Access Toolbar */
-        #quickToolbar {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 99;
-            background: rgba(0,20,40,0.8);
-            border: 1px solid #00ffff;
-            border-radius: 25px;
-            padding: 10px 20px;
-            display: flex;
-            gap: 15px;
-            backdrop-filter: blur(10px);
-        }
-        
-        .quick-btn {
-            background: none;
-            border: 1px solid #00ffff;
-            color: #00ffff;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            cursor: pointer;
-            transition: all 0.3s;
-            font-size: 16px;
-        }
-        
-        .quick-btn:hover {
-            background: rgba(0,255,255,0.2);
-            transform: scale(1.1);
-        }
-        
-        .quick-btn.active {
-            background: rgba(0,255,255,0.3);
-            box-shadow: 0 0 15px rgba(0,255,255,0.5);
-        }
-        
-        .control-group {
-            margin-bottom: 15px;
-        }
-        
-        .control-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-size: 12px;
-            color: #66ffff;
-        }
-        
-        input[type="file"] {
-            width: 100%;
-            padding: 8px;
-            background: rgba(0,50,100,0.5);
-            border: 1px solid #00ffff;
-            color: #00ffff;
-            border-radius: 5px;
-            margin-bottom: 10px;
-        }
-        
-        button {
-            width: 100%;
-            padding: 10px;
-            background: linear-gradient(135deg, #00ffff, #0088ff);
-            border: none;
-            color: #000;
-            font-weight: bold;
-            border-radius: 5px;
-            cursor: pointer;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            transition: all 0.3s;
-            margin-bottom: 5px;
-        }
-        
-        button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(0,255,255,0.5);
-        }
-        
-        input[type="range"] {
-            width: 100%;
-            appearance: none;
-            height: 5px;
-            background: linear-gradient(90deg, #00ffff, #0088ff);
-            border-radius: 5px;
-            outline: none;
-        }
-        
-        input[type="range"]::-webkit-slider-thumb {
-            appearance: none;
-            width: 15px;
-            height: 15px;
-            background: #00ffff;
-            border-radius: 50%;
-            cursor: pointer;
-            box-shadow: 0 0 10px #00ffff;
-        }
-        
-        .value-display {
-            float: right;
-            color: #ffff00;
-            font-weight: bold;
-        }
-        
-        #stats {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            color: #00ff00;
-            font-size: 12px;
-            font-family: monospace;
-            background: rgba(0,0,0,0.8);
-            padding: 10px;
-            border-radius: 5px;
-            border: 1px solid #00ff00;
-            transition: opacity 0.3s;
-        }
-        
-        #stats.minimal {
-            opacity: 0.3;
-        }
-        
-        #stats.minimal:hover {
-            opacity: 1;
-        }
-        
-        .preset-btn {
-            background: linear-gradient(135deg, #ff00ff, #00ffff);
-            margin-top: 10px;
-        }
-        
-        #effectToggle {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 5px;
-            margin-top: 10px;
-        }
-        
-        .toggle-btn {
-            padding: 5px;
-            font-size: 11px;
-            background: rgba(0,255,255,0.2);
-            border: 1px solid #00ffff;
-        }
-        
-        .toggle-btn.active {
-            background: linear-gradient(135deg, #00ffff, #0088ff);
-            color: #000;
-        }
-        
-        /* Notification System */
-        .notification {
-            position: fixed;
-            top: 100px;
-            right: -350px;
-            background: linear-gradient(135deg, rgba(0,255,255,0.9), rgba(0,136,255,0.9));
-            color: #000;
-            padding: 15px 20px;
-            border-radius: 5px;
-            font-weight: bold;
-            transition: right 0.5s;
-            z-index: 102;
-            max-width: 300px;
-        }
-        
-        .notification.show {
-            right: 20px;
-        }
-        
-        /* Advanced Mode Indicator */
-        #modeIndicator {
-            position: fixed;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: #ff00ff;
-            font-size: 14px;
-            text-transform: uppercase;
-            letter-spacing: 3px;
-            text-shadow: 0 0 10px currentColor;
-            opacity: 0;
-            transition: opacity 0.5s;
-        }
-        
-        #modeIndicator.visible {
-            opacity: 1;
-        }
-        
-        /* WebXR Button */
-        #xrButton {
-            position: fixed;
-            bottom: 80px;
-            right: 20px;
-            padding: 12px 24px;
-            background: linear-gradient(135deg, #ff00ff, #00ffff);
-            border: none;
-            border-radius: 25px;
-            color: #000;
-            font-weight: bold;
-            cursor: pointer;
-            text-transform: uppercase;
-            transition: all 0.3s;
-            display: none;
-        }
-        
-        #xrButton.available {
-            display: block;
-        }
-        
-        #xrButton:hover {
-            transform: scale(1.05);
-            box-shadow: 0 5px 30px rgba(255,0,255,0.5);
-        }
-    </style>
-</head>
-<body>
-    <div id="loading">
-        <div>INITIALIZING QUANTUM HOLOGRAPHIC SYSTEM...</div>
-        <div style="font-size: 14px; margin-top: 10px; color: #ff00ff;">GPU ACCELERATION ENABLED</div>
-    </div>
-    
-    <div id="togglePanel" title="Toggle Control Panel"></div>
-    
-    <div id="modeIndicator">ADVANCED MODE</div>
-    
-    <div id="controlPanel">
-        <h3>🎬 Quantum Holographic Control</h3>
-        
-        <div class="control-group">
-            <input type="file" id="fileInput" accept="video/*">
-            <button id="defaultVideo">Load Demo Video</button>
-            <button id="testSystem">Test System</button>
-        </div>
-        
-        <div class="control-group">
-            <label>Volume <span class="value-display" id="volumeValue">50%</span></label>
-            <input type="range" id="volume" min="0" max="100" value="50">
-        </div>
-        
-        <div class="control-group">
-            <label>Particle Density <span class="value-display" id="densityValue">3</span></label>
-            <input type="range" id="density" min="1" max="5" value="3" step="1">
-        </div>
-        
-        <div class="control-group">
-            <label>Resolution Quality <span class="value-display" id="resolutionValue">2</span></label>
-            <input type="range" id="resolution" min="1" max="4" value="2" step="1">
-        </div>
-        
-        <div class="control-group">
-            <label>Scan Lines <span class="value-display" id="scanValue">0.3</span></label>
-            <input type="range" id="scanlines" min="0" max="1" value="0.3" step="0.1">
-        </div>
-        
-        <div class="control-group">
-            <label>Glitch Intensity <span class="value-display" id="glitchValue">0.1</span></label>
-            <input type="range" id="glitch" min="0" max="1" value="0.1" step="0.1">
-        </div>
-        
-        <div class="control-group">
-            <label>Chromatic Aberration <span class="value-display" id="chromaValue">0.3</span></label>
-            <input type="range" id="chroma" min="0" max="2" value="0.3" step="0.1">
-        </div>
-        
-        <div class="control-group">
-            <label>Depth Scale <span class="value-display" id="depthValue">120</span></label>
-            <input type="range" id="depth" min="0" max="300" value="120">
-        </div>
-        
-        <div class="control-group">
-            <label>Rotation Speed <span class="value-display" id="rotationValue">0.1</span></label>
-            <input type="range" id="rotation" min="0" max="1" value="0.1" step="0.1">
-        </div>
-        
-        <div class="control-group">
-            <label>Curl Noise <span class="value-display" id="curlValue">0.5</span></label>
-            <input type="range" id="curl" min="0" max="2" value="0.5" step="0.1">
-        </div>
-        
-        <div class="control-group">
-            <label>Brightness <span class="value-display" id="brightnessValue">1.2</span></label>
-            <input type="range" id="brightness" min="0.5" max="2" value="1.2" step="0.1">
-        </div>
-        
-        <div class="control-group" style="background: rgba(255,100,0,0.1); padding: 10px; border-radius: 5px; border: 1px solid #ff6600;">
-            <label style="color: #ffaa00;">🎯 Hologram Intensity <span class="value-display" id="hologramIntensityValue">50%</span></label>
-            <input type="range" id="hologramIntensity" min="0" max="100" value="50" step="5">
-            <small style="color: #ffaa00; display: block; margin-top: 5px;">0% = Clear Video | 100% = Full Hologram</small>
-        </div>
-        
-        <div class="control-group">
-            <label>Video Clarity <span class="value-display" id="clarityValue">0.5</span></label>
-            <input type="range" id="clarity" min="0" max="1" value="0.5" step="0.05">
-        </div>
-        
-        <div class="control-group">
-            <label>Focus Depth <span class="value-display" id="focusValue">0.5</span></label>
-            <input type="range" id="focus" min="0" max="1" value="0.5" step="0.05">
-        </div>
-        
-        <button class="preset-btn" id="presetCyber">CYBER MODE</button>
-        <button class="preset-btn" id="presetMatrix">MATRIX MODE</button>
-        <button class="preset-btn" id="presetClean">ULTRA HD MODE</button>
-        <button class="preset-btn" id="presetQuantum">QUANTUM MODE</button>
-        <button class="preset-btn" id="presetCinema" style="background: linear-gradient(135deg, #ffaa00, #ff0066);">CINEMA MODE</button>
-        
-        <div id="effectToggle">
-            <button class="toggle-btn active" data-effect="particles">Particles</button>
-            <button class="toggle-btn active" data-effect="wireframe">Wireframe</button>
-            <button class="toggle-btn active" data-effect="glow">Glow</button>
-            <button class="toggle-btn active" data-effect="distortion">Distortion</button>
-            <button class="toggle-btn active" data-effect="curl">Curl Noise</button>
-            <button class="toggle-btn active" data-effect="bloom">Bloom</button>
-        </div>
-    </div>
-    
-    <div id="quickToolbar">
-        <button class="quick-btn" id="playPause" title="Play/Pause">⏸</button>
-        <button class="quick-btn" id="muteToggle" title="Mute/Unmute">🔊</button>
-        <button class="quick-btn" id="fullscreen" title="Fullscreen">⛶</button>
-        <button class="quick-btn" id="snapshot" title="Take Snapshot">📷</button>
-        <button class="quick-btn" id="reset" title="Reset View">↻</button>
-        <button class="quick-btn" id="gestureMode" title="Gesture Control">👋</button>
-        <button class="quick-btn" id="autoPlay" title="Auto Effects">✨</button>
-        <button class="quick-btn" id="recordMode" title="Record">⏺</button>
-    </div>
-    
-    <div id="interactiveIndicator" style="position: fixed; top: 60px; left: 50%; transform: translateX(-50%); color: #00ff00; font-size: 12px; text-transform: uppercase; letter-spacing: 2px; display: none; z-index: 101;">
-        <span id="interactiveText">GESTURE CONTROL ACTIVE</span>
-    </div>
-    
-    <div id="videoTimeline" style="position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); width: 60%; max-width: 600px; display: none; z-index: 99;">
-        <div style="background: rgba(0,20,40,0.8); padding: 10px; border-radius: 10px; border: 1px solid #00ffff;">
-            <input type="range" id="videoSeek" min="0" max="100" value="0" style="width: 100%;">
-            <div style="display: flex; justify-content: space-between; color: #00ffff; font-size: 12px; margin-top: 5px;">
-                <span id="currentTime">00:00</span>
-                <span id="duration">00:00</span>
-            </div>
-        </div>
-    </div>
-    
-    <div id="stats" class="minimal">
-        <div>FPS: <span id="fps">60</span></div>
-        <div>Particles: <span id="particleCount">0</span></div>
-        <div>Draw Calls: <span id="drawCalls">0</span></div>
-        <div>GPU Memory: <span id="gpuMemory">0</span> MB</div>
-    </div>
-    
-    <button id="xrButton">Enter VR/AR</button>
-    
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ultra Cool AR P5.js Experience</title>
+
+    <!-- Load Libraries -->
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.3/dist/mindar-image-aframe.prod.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+
+    <!-- P5.js Sketch -->
     <script>
-        // Global variables
-        let scene, camera, renderer, composer;
-        let hologramGroup, particles, wireframeMesh, glowMesh;
-        let material, wireframeMaterial, glowMaterial;
-        let video, videoTexture;
-        let clock = new THREE.Clock();
-        let stats = { fps: 60, lastTime: performance.now(), frames: 0 };
-        let gpuCompute, velocityVariable, positionVariable;
-        let isAdvancedMode = false;
-        
-        // Configuration with enhanced defaults
-        const config = {
-            density: 3,
-            resolution: 2,
-            scanlines: 0.3,
-            glitch: 0.1,
-            chroma: 0.3,
-            depth: 120,
-            rotation: 0.1,
-            curl: 0.5,
-            brightness: 1.2,
-            hologramIntensity: 0.5,
-            clarity: 0.5,
-            focus: 0.5,
-            autoEffects: false,
-            gestureControl: false,
-            recording: false,
-            effects: {
-                particles: true,
-                wireframe: true,
-                glow: true,
-                distortion: true,
-                curl: true,
-                bloom: true
-            }
-        };
-        
-        // Interactive features state
-        const interactiveState = {
-            mouseTrail: [],
-            gesturePoints: [],
-            autoEffectTime: 0,
-            recordedFrames: [],
-            touchPoints: new Map(),
-            pinchScale: 1,
-            lastPinchDistance: 0
-        };
-        
-        // Show notification
-        function showNotification(message, duration = 3000) {
-            const notification = document.createElement('div');
-            notification.className = 'notification';
-            notification.textContent = message;
-            document.body.appendChild(notification);
+        let particles = [];
+        let attractors = [];
+        let colorPalette;
+        let time = 0;
+        let waveAmplitude = 0;
+        let targetDetected = false;
+        let morphProgress = 0;
+        let circleWaves = [];
+        let flowField = [];
+        let flowFieldCols, flowFieldRows;
+        let flowFieldScale = 20;
+
+        function setup() {
+            let canvas = createCanvas(800, 1129, document.getElementById('canvas-ar'));
             
-            setTimeout(() => {
-                notification.classList.add('show');
-            }, 100);
-            
-            setTimeout(() => {
-                notification.classList.remove('show');
-                setTimeout(() => {
-                    notification.remove();
-                }, 500);
-            }, duration);
-        }
-        
-        // Initialize Three.js with enhanced setup
-        function init() {
-            // Scene setup
-            scene = new THREE.Scene();
-            scene.fog = new THREE.FogExp2(0x000000, 0.0008);
-            
-            // Camera setup with better FOV
-            camera = new THREE.PerspectiveCamera(
-                60, 
-                window.innerWidth / window.innerHeight, 
-                0.1, 
-                3000
-            );
-            camera.position.set(0, 0, 500);
-            
-            // Enhanced renderer setup
-            renderer = new THREE.WebGLRenderer({ 
-                antialias: true,
-                alpha: true,
-                powerPreference: "high-performance",
-                precision: "highp",
-                stencil: false,
-                depth: true
-            });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-            renderer.shadowMap.enabled = true;
-            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-            renderer.outputEncoding = THREE.sRGBEncoding;
-            renderer.toneMapping = THREE.ACESFilmicToneMapping;
-            renderer.toneMappingExposure = 1.2;
-            document.body.appendChild(renderer.domElement);
-            
-            // Check for WebXR support
-            if ('xr' in navigator) {
-                navigator.xr.isSessionSupported('immersive-vr').then((supported) => {
-                    if (supported) {
-                        const xrButton = document.getElementById('xrButton');
-                        xrButton.classList.add('available');
-                        xrButton.addEventListener('click', startXR);
-                    }
-                });
-            }
-            
-            // Hologram group
-            hologramGroup = new THREE.Group();
-            scene.add(hologramGroup);
-            
-            // Enhanced lighting
-            setupAdvancedLighting();
-            
-            // Controls
-            setupControls();
-            
-            // Event listeners
-            setupEventListeners();
-            
-            // Background effects
-            createAdvancedBackground();
-            
-            // Start animation
-            animate();
-            
-            showNotification('System Initialized Successfully', 2000);
-        }
-        
-        // Advanced lighting with dynamic colors
-        function setupAdvancedLighting() {
-            // Ambient light with color variation
-            const ambientLight = new THREE.AmbientLight(0x0088ff, 0.15);
-            scene.add(ambientLight);
-            
-            // Dynamic point lights
-            const lightColors = [
-                { color: 0x00ffff, intensity: 0.6 },
-                { color: 0xff00ff, intensity: 0.4 },
-                { color: 0xffff00, intensity: 0.3 },
-                { color: 0x00ff00, intensity: 0.3 }
+            // Dynamic color palette
+            colorPalette = [
+                color(255, 100, 150, 200),  // Neon pink
+                color(100, 255, 255, 200),  // Cyan
+                color(255, 255, 100, 200),  // Yellow
+                color(150, 100, 255, 200),  // Purple
+                color(100, 255, 150, 200)   // Mint
             ];
             
-            lightColors.forEach((light, i) => {
-                const pointLight = new THREE.PointLight(light.color, light.intensity, 800);
-                const angle = (i / lightColors.length) * Math.PI * 2;
-                pointLight.position.set(
-                    Math.sin(angle) * 300,
-                    Math.cos(angle) * 200,
-                    150
-                );
-                scene.add(pointLight);
-                
-                // Animate lights
-                pointLight.userData = { angle, radius: 300, speed: 0.5 + i * 0.1 };
-            });
+            // Initialize particle system
+            for (let i = 0; i < 150; i++) {
+                particles.push(new Particle(random(width), random(height)));
+            }
             
-            // Spot light for dramatic effect
-            const spotLight = new THREE.SpotLight(0x00ffff, 0.5);
-            spotLight.position.set(0, 500, 500);
-            spotLight.angle = Math.PI / 6;
-            spotLight.penumbra = 0.3;
-            spotLight.decay = 2;
-            spotLight.distance = 2000;
-            scene.add(spotLight);
+            // Initialize circular wave system
+            for (let i = 0; i < 5; i++) {
+                circleWaves.push({
+                    x: width/2,
+                    y: height/2,
+                    radius: i * 100,
+                    phase: i * PI/5,
+                    color: random(colorPalette)
+                });
+            }
+            
+            // Initialize flow field
+            flowFieldCols = floor(width / flowFieldScale);
+            flowFieldRows = floor(height / flowFieldScale);
+            generateFlowField();
+            
+            // Create circular attractors
+            let numAttractors = 8;
+            for (let i = 0; i < numAttractors; i++) {
+                let angle = (TWO_PI / numAttractors) * i;
+                let x = width/2 + cos(angle) * 200;
+                let y = height/2 + sin(angle) * 200;
+                attractors.push(createVector(x, y));
+            }
         }
-        
-        // Enhanced hologram creation with GPGPU-style effects
-        function createHologram(videoElement) {
-            if (!videoElement) {
-                console.error('Video element not ready');
-                return;
-            }
-            
-            console.log('Creating enhanced hologram...');
-            
-            // Clear previous hologram
-            if (hologramGroup) {
-                while(hologramGroup.children.length > 0) {
-                    const child = hologramGroup.children[0];
-                    if (child.geometry) child.geometry.dispose();
-                    if (child.material) {
-                        if (child.material.uniforms && child.material.uniforms.video && child.material.uniforms.video.value) {
-                            child.material.uniforms.video.value.dispose();
-                        }
-                        child.material.dispose();
-                    }
-                    hologramGroup.remove(child);
-                }
-            }
-            
-            // Create video texture with better settings
-            videoTexture = new THREE.VideoTexture(videoElement);
-            videoTexture.minFilter = THREE.LinearFilter;
-            videoTexture.magFilter = THREE.LinearFilter;
-            videoTexture.format = THREE.RGBFormat;
-            videoTexture.generateMipmaps = false;
-            
-            // Resolution settings for better quality
-            const resolutionMap = {
-                1: { width: 160, height: 90 },   // Low
-                2: { width: 256, height: 144 },  // Medium
-                3: { width: 384, height: 216 },  // High
-                4: { width: 512, height: 288 }   // Ultra
-            };
-            
-            const densityMap = {
-                1: 0.5,
-                2: 0.7,
-                3: 1.0,
-                4: 1.3,
-                5: 1.5
-            };
-            
-            const res = resolutionMap[config.resolution];
-            const densityMultiplier = densityMap[config.density];
-            const width = Math.floor(res.width * densityMultiplier);
-            const height = Math.floor(res.height * densityMultiplier);
-            const particleCount = width * height;
-            
-            document.getElementById('particleCount').textContent = particleCount;
-            
-            // Create enhanced particle system
-            if (config.effects.particles) {
-                createEnhancedParticleSystem(width, height);
-            }
-            
-            // Create high-quality wireframe
-            if (config.effects.wireframe) {
-                createEnhancedWireframe(width, height);
-            }
-            
-            // Create advanced glow effect
-            if (config.effects.glow) {
-                createAdvancedGlowEffect();
-            }
-            
-            document.getElementById('loading').style.display = 'none';
-            showNotification('Hologram Loaded Successfully', 2000);
-        }
-        
-        // Enhanced particle system with curl noise simulation
-        function createEnhancedParticleSystem(width, height) {
-            const particleCount = width * height;
-            const geometry = new THREE.BufferGeometry();
-            
-            const positions = new Float32Array(particleCount * 3);
-            const uvs = new Float32Array(particleCount * 2);
-            const indices = new Float32Array(particleCount);
-            const randoms = new Float32Array(particleCount * 3);
-            
-            for (let i = 0; i < width; i++) {
-                for (let j = 0; j < height; j++) {
-                    const index = j * width + i;
-                    
-                    positions[index * 3] = (i / width - 0.5) * 400;
-                    positions[index * 3 + 1] = (j / height - 0.5) * 225;
-                    positions[index * 3 + 2] = 0;
-                    
-                    uvs[index * 2] = i / (width - 1);
-                    uvs[index * 2 + 1] = j / (height - 1);
-                    
-                    indices[index] = index;
-                    
-                    randoms[index * 3] = Math.random();
-                    randoms[index * 3 + 1] = Math.random();
-                    randoms[index * 3 + 2] = Math.random();
-                }
-            }
-            
-            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-            geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
-            geometry.setAttribute('index', new THREE.BufferAttribute(indices, 1));
-            geometry.setAttribute('random', new THREE.BufferAttribute(randoms, 3));
-            
-            // Enhanced holographic shader with curl noise
-            material = new THREE.ShaderMaterial({
-                uniforms: {
-                    video: { value: videoTexture },
-                    time: { value: 0 },
-                    depthScale: { value: config.depth },
-                    scanlines: { value: config.scanlines },
-                    glitchIntensity: { value: config.glitch },
-                    chromaticAberration: { value: config.chroma },
-                    distortion: { value: config.effects.distortion ? 1.0 : 0.0 },
-                    curlIntensity: { value: config.curl },
-                    brightness: { value: config.brightness },
-                    hologramIntensity: { value: config.hologramIntensity },
-                    clarity: { value: config.clarity },
-                    focus: { value: config.focus },
-                    resolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
-                    mousePosition: { value: new THREE.Vector2(0, 0) },
-                    touchPoints: { value: new THREE.Vector2(0, 0) }
-                },
-                vertexShader: `
-                    varying vec2 vUv;
-                    varying vec3 vColor;
-                    varying float vDepth;
-                    varying vec3 vPosition;
-                    varying vec3 vNormal;
-                    
-                    uniform sampler2D video;
-                    uniform float time;
-                    uniform float depthScale;
-                    uniform float distortion;
-                    uniform float curlIntensity;
-                    uniform vec2 mousePosition;
-                    
-                    attribute float index;
-                    attribute vec3 random;
-                    
-                    // Corrected Simplex Noise
-                    vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
-                    vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
-                    vec4 permute(vec4 x) { return mod289(((x*34.0)+1.0)*x); }
-                    vec4 taylorInvSqrt(vec4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
 
-                    float snoise(vec3 v) {
-                        const vec2 C = vec2(1.0/6.0, 1.0/3.0);
-                        const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
-                        vec3 i = floor(v + dot(v, C.yyy));
-                        vec3 x0 = v - i + dot(i, C.xxx);
-                        vec3 g = step(x0.yzx, x0.xyz);
-                        vec3 l = 1.0 - g;
-                        vec3 i1 = min(g.xyz, l.zxy);
-                        vec3 i2 = max(g.xyz, l.zxy);
-                        vec3 x1 = x0 - i1 + C.xxx;
-                        vec3 x2 = x0 - i2 + C.yyy;
-                        vec3 x3 = x0 - D.yyy;
-                        i = mod289(i);
-                        vec4 p = permute(i.z + vec4(0.0, i1.z, i2.z, 1.0));
-                        p = permute(p + i.y + vec4(0.0, i1.y, i2.y, 1.0));
-                        p = permute(p + i.x + vec4(0.0, i1.x, i2.x, 1.0));
-                        float n_ = 0.142857142857;
-                        vec3 ns = n_ * D.wyz - D.xzx;
-                        vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
-                        vec4 x_ = floor(j * ns.z);
-                        vec4 y_ = floor(j - 7.0 * x_);
-                        vec4 x = x_ * ns.x + ns.yyyy;
-                        vec4 y = y_ * ns.x + ns.yyyy;
-                        vec4 h = 1.0 - abs(x) - abs(y);
-                        vec4 b0 = vec4(x.xy, y.xy);
-                        vec4 b1 = vec4(x.zw, y.zw);
-                        vec4 s0 = floor(b0) * 2.0 + 1.0;
-                        vec4 s1 = floor(b1) * 2.0 + 1.0;
-                        vec4 sh = -step(h, vec4(0.0));
-                        vec4 a0 = b0.xzyw + s0.xzyw * sh.xxyy;
-                        vec4 a1 = b1.xzyw + s1.xzyw * sh.zzww;
-                        vec3 p0 = vec3(a0.xy, h.x);
-                        vec3 p1 = vec3(a0.zw, h.y);
-                        vec3 p2 = vec3(a1.xy, h.z);
-                        vec3 p3 = vec3(a1.zw, h.w);
-                        vec4 norm = taylorInvSqrt(vec4(dot(p0, p0), dot(p1, p1), dot(p2, p2), dot(p3, p3)));
-                        p0 *= norm.x;
-                        p1 *= norm.y;
-                        p2 *= norm.z;
-                        p3 *= norm.w;
-                        vec4 m = max(0.6 - vec4(dot(x0, x0), dot(x1, x1), dot(x2, x2), dot(x3, x3)), 0.0);
-                        m = m * m;
-                        return 42.0 * dot(m * m, vec4(dot(p0, x0), dot(p1, x1), dot(p2, x2), dot(p3, x3)));
-                    }
+        function draw() {
+            // Dynamic gradient background
+            drawGradientBackground();
+            
+            time += 0.02;
+            waveAmplitude = sin(time) * 50;
+            
+            // Smooth morph animation
+            if (targetDetected) {
+                morphProgress = min(morphProgress + 0.03, 1);
+            } else {
+                morphProgress = max(morphProgress - 0.03, 0);
+            }
+            
+            // Draw flow field visualization
+            if (morphProgress > 0.5) {
+                drawFlowField();
+            }
+            
+            // Draw morphing circular waves
+            push();
+            translate(width/2, height/2);
+            for (let wave of circleWaves) {
+                drawMorphingCircle(wave);
+            }
+            pop();
+            
+            // Update and draw particle system
+            for (let particle of particles) {
+                particle.followField(flowField);
+                particle.update(attractors, morphProgress);
+                particle.display();
+            }
+            
+            // Central pulsing orb
+            drawCentralOrb();
+            
+            // Draw connecting lines between nearby particles
+            drawConnections();
+            
+            // Add glowing text overlay
+            if (morphProgress > 0.8) {
+                drawGlowingText();
+            }
+        }
 
-                    // Curl noise implementation
-                    vec3 curlNoise(vec3 p) {
-                        float epsilon = 0.01;
-                        vec3 dx = vec3(epsilon, 0.0, 0.0);
-                        vec3 dy = vec3(0.0, epsilon, 0.0);
-                        vec3 dz = vec3(0.0, 0.0, epsilon);
-                        
-                        vec3 p_x0 = vec3(snoise(p - dx), snoise(p - dy), snoise(p - dz));
-                        vec3 p_x1 = vec3(snoise(p + dx), snoise(p + dy), snoise(p + dz));
-                        
-                        return normalize(p_x1 - p_x0);
-                    }
-                    
-                    void main() {
-                        vUv = uv;
-                        vec4 color = texture2D(video, uv);
-                        vColor = color.rgb;
-                        
-                        // Enhanced luminance calculation
-                        float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
-                        luminance = pow(luminance, 0.8); // Gamma correction for better depth
-                        vDepth = luminance;
-                        
-                        vec3 pos = position;
-                        
-                        // High-quality depth mapping
-                        float depthOffset = -luminance * depthScale;
-                        pos.z = depthOffset;
-                        
-                        // Curl noise displacement
-                        if (curlIntensity > 0.0) {
-                            vec3 curlOffset = curlNoise(vec3(uv * 10.0, time * 0.5));
-                            pos += curlOffset * curlIntensity * 20.0 * luminance;
-                        }
-                        
-                        // Advanced wave distortion
-                        float wave1 = sin(uv.x * 15.0 + time * 2.0) * cos(uv.y * 15.0 + time * 1.5);
-                        float wave2 = sin(uv.x * 7.0 - time * 1.5) * cos(uv.y * 9.0 + time * 2.0);
-                        pos.z += (wave1 + wave2 * 0.5) * 3.0 * distortion;
-                        
-                        // Simplex noise displacement
-                        vec3 noisePos = vec3(uv * 8.0, time * 0.3);
-                        float n = snoise(noisePos);
-                        pos.xy += vec2(n) * 5.0 * distortion;
-                        
-                        // Mouse interaction
-                        float mouseDistance = distance(uv, mousePosition);
-                        float mouseEffect = smoothstep(0.3, 0.0, mouseDistance);
-                        pos.z += mouseEffect * 30.0;
-                        
-                        // Pulsing with variation
-                        float pulse = sin(time * 3.0 + index * 0.001 + random.x * 6.28) * 0.5 + 0.5;
-                        pos.z += pulse * 3.0 * random.y;
-                        
-                        // Spiral motion
-                        float spiralAngle = time * 0.5 + random.z * 6.28;
-                        pos.x += sin(spiralAngle) * random.x * 5.0;
-                        pos.y += cos(spiralAngle) * random.y * 5.0;
-                        
-                        vPosition = pos;
-                        vNormal = normalize(vec3(n, n * 0.5, 1.0));
-                        
-                        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-                        
-                        // Advanced point sizing
-                        float size = mix(1.5, 4.0, luminance);
-                        size *= (1.0 + pulse * 0.3);
-                        size *= (1.0 + mouseEffect * 0.5);
-                        size = max(size, 1.0);
-                        gl_PointSize = size;
-                    }
-                `,
-                fragmentShader: `
-                    varying vec2 vUv;
-                    varying vec3 vColor;
-                    varying float vDepth;
-                    varying vec3 vPosition;
-                    varying vec3 vNormal;
-                    
-                    uniform float time;
-                    uniform float scanlines;
-                    uniform float glitchIntensity;
-                    uniform float chromaticAberration;
-                    uniform float brightness;
-                    uniform float hologramIntensity;
-                    uniform float clarity;
-                    uniform float focus;
-                    uniform vec2 resolution;
-                    uniform sampler2D video;
-                    
-                    // Hash function for randomness
-                    float hash(vec2 p) {
-                        vec3 p3 = fract(vec3(p.xyx) * 0.13);
-                        p3 += dot(p3, p3.yzx + 3.333);
-                        return fract((p3.x + p3.y) * p3.z);
-                    }
-                    
-                    // Film grain
-                    float grain(vec2 uv, float t) {
-                        return hash(uv + t) * 0.05;
-                    }
-                    
-                    // Gaussian blur for clarity
-                    vec3 getBlurredColor(vec2 uv, float blurAmount) {
-                        vec3 color = vec3(0.0);
-                        float total = 0.0;
-                        
-                        for(float x = -2.0; x <= 2.0; x++) {
-                            for(float y = -2.0; y <= 2.0; y++) {
-                                float weight = exp(-(x*x + y*y) / (2.0 * blurAmount * blurAmount));
-                                vec2 offset = vec2(x, y) / resolution * 2.0;
-                                color += texture2D(video, uv + offset).rgb * weight;
-                                total += weight;
-                            }
-                        }
-                        
-                        return color / total;
-                    }
-                    
-                    void main() {
-                        vec2 coord = gl_PointCoord - vec2(0.5);
-                        float dist = length(coord);
-                        
-                        // Smooth circular points with antialiasing
-                        float alpha = 1.0 - smoothstep(0.45, 0.5, dist);
-                        if(alpha < 0.01) discard;
-                        
-                        // Base color for holographic effects
-                        vec3 holoColor = vColor;
-                        
-                        // Apply hologram effects based on intensity
-                        if (hologramIntensity > 0.0) {
-                            // Enhanced chromatic aberration
-                            if (chromaticAberration > 0.0) {
-                                float aberration = chromaticAberration * 0.01 * hologramIntensity * (1.0 + sin(time * 2.0) * 0.2);
-                                holoColor.r = texture2D(video, vUv + vec2(aberration, 0.0)).r;
-                                holoColor.g = mix(holoColor.g, vColor.g, hologramIntensity);
-                                holoColor.b = texture2D(video, vUv - vec2(aberration, 0.0)).b;
-                            }
-                            
-                            // Advanced holographic color shift
-                            float holo1 = sin(vPosition.x * 0.05 + time) * 0.5 + 0.5;
-                            float holo2 = cos(vPosition.y * 0.05 - time * 0.7) * 0.5 + 0.5;
-                            vec3 holoShiftColor = mix(
-                                vec3(0.0, 1.0, 1.0),
-                                vec3(1.0, 0.0, 1.0),
-                                holo1
-                            );
-                            holoColor = mix(holoColor, holoShiftColor, holo2 * 0.2 * hologramIntensity);
-                            
-                            // High-quality scanlines
-                            if (scanlines > 0.0) {
-                                float scanline = sin(gl_FragCoord.y * 0.7 + time * 10.0) * 0.04 + 
-                                               sin(gl_FragCoord.y * 1.3 + time * 15.0) * 0.02;
-                                scanline = 1.0 + scanline * scanlines * hologramIntensity;
-                                holoColor *= scanline;
-                            }
-                            
-                            // Improved glitch effect
-                            if (glitchIntensity > 0.0) {
-                                float glitchTime = floor(time * 10.0) / 10.0;
-                                float glitch = hash(vec2(glitchTime, vUv.y));
-                                
-                                if(glitch < glitchIntensity * hologramIntensity * 0.05) {
-                                    holoColor.rgb = vec3(1.0 - holoColor.r, holoColor.g, 1.0 - holoColor.b);
-                                    holoColor = mix(holoColor, vec3(hash(vUv + time)), 0.1);
-                                }
-                            }
-                            
-                            // Advanced edge glow with color
-                            float edgeFactor = 1.0 - dist * 2.0;
-                            vec3 edgeGlow = mix(
-                                vec3(0.0, 1.0, 1.0),
-                                vec3(1.0, 0.0, 1.0),
-                                sin(time * 3.0 + vPosition.x * 0.01) * 0.5 + 0.5
-                            );
-                            holoColor += edgeGlow * pow(edgeFactor, 3.0) * 0.5 * hologramIntensity;
-                            
-                            // Film grain for texture
-                            holoColor += vec3(grain(gl_FragCoord.xy, time)) * 0.5 * hologramIntensity;
-                            
-                            // Subtle flickering
-                            float flicker = sin(time * 60.0 + hash(vUv) * 100.0) * 0.03 + 0.97;
-                            holoColor *= mix(1.0, flicker, hologramIntensity);
-                        }
-                        
-                        // *** CORRECTED CLARITY LOGIC ***
-                        // Get the original, clear video color
-                        vec3 clearColor = texture2D(video, vUv).rgb;
-                        // Blend between the holographic color and clear color based on clarity
-                        vec3 finalColor = mix(holoColor, clearColor, clarity);
-                        
-                        // Focus depth effect
-                        float depthFocus = abs(vDepth - focus);
-                        float focusBlur = smoothstep(0.0, 0.5, depthFocus);
-                        finalColor = mix(finalColor, getBlurredColor(vUv, focusBlur * 2.0), focusBlur * 0.5);
-                        
-                        // Depth-based brightness with better falloff
-                        float depthBrightness = 0.6 + vDepth * 0.6;
-                        depthBrightness = pow(depthBrightness, 0.8);
-                        finalColor *= depthBrightness * brightness;
-                        
-                        // Fresnel effect (reduced based on hologram intensity)
-                        float fresnel = pow(1.0 - abs(dot(normalize(vNormal), vec3(0.0, 0.0, 1.0))), 2.0);
-                        finalColor += vec3(0.2, 0.6, 1.0) * fresnel * 0.3 * hologramIntensity;
-                        
-                        // Color grading
-                        finalColor = pow(finalColor, vec3(0.9)); // Slight gamma adjustment
-                        finalColor = mix(finalColor, vec3(dot(finalColor, vec3(0.299, 0.587, 0.114))), -0.1 * hologramIntensity); // Saturation
-                        
-                        // Final alpha with smooth falloff
-                        alpha *= mix(1.0, 0.85 + vDepth * 0.15, hologramIntensity);
-                        alpha *= pow(dist, 0.5);
-                        
-                        gl_FragColor = vec4(finalColor, alpha);
-                    }
-                `,
-                transparent: true,
-                blending: THREE.AdditiveBlending,
-                depthWrite: false,
-                depthTest: true
-            });
-            
-            particles = new THREE.Points(geometry, material);
-            hologramGroup.add(particles);
-        }
-        
-        // Enhanced wireframe with better quality
-        function createEnhancedWireframe(width, height) {
-            const geometry = new THREE.PlaneGeometry(400, 225, Math.floor(width/3), Math.floor(height/3));
-            
-            wireframeMaterial = new THREE.ShaderMaterial({
-                uniforms: {
-                    video: { value: videoTexture },
-                    time: { value: 0 },
-                    depthScale: { value: config.depth },
-                    brightness: { value: config.brightness },
-                    hologramIntensity: { value: config.hologramIntensity }
-                },
-                vertexShader: `
-                    varying vec2 vUv;
-                    varying float vDepth;
-                    
-                    uniform sampler2D video;
-                    uniform float depthScale;
-                    uniform float time;
-                    uniform float hologramIntensity;
-                    
-                    void main() {
-                        vUv = uv;
-                        vec4 color = texture2D(video, uv);
-                        float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
-                        vDepth = pow(luminance, 0.8);
-                        
-                        vec3 pos = position;
-                        pos.z = -vDepth * depthScale * 0.5 * hologramIntensity;
-                        
-                        // Smooth wave effect
-                        pos.z += sin(pos.x * 0.03 + time) * 5.0 * hologramIntensity;
-                        pos.z += cos(pos.y * 0.03 + time * 0.7) * 5.0 * hologramIntensity;
-                        
-                        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-                    }
-                `,
-                fragmentShader: `
-                    varying vec2 vUv;
-                    varying float vDepth;
-                    
-                    uniform float time;
-                    uniform float brightness;
-                    uniform float hologramIntensity;
-                    
-                    void main() {
-                        vec3 color = mix(
-                            vec3(0.0, 1.0, 1.0),
-                            vec3(0.0, 0.5, 1.0),
-                            sin(time * 2.0 + vUv.x * 10.0) * 0.5 + 0.5
-                        );
-                        
-                        float alpha = (0.05 + vDepth * 0.15) * hologramIntensity;
-                        alpha *= 0.8 + sin(time * 5.0) * 0.2;
-                        alpha *= brightness * 0.8;
-                        
-                        gl_FragColor = vec4(color, alpha);
-                    }
-                `,
-                wireframe: true,
-                transparent: true,
-                blending: THREE.AdditiveBlending,
-                depthWrite: false
-            });
-            
-            wireframeMesh = new THREE.Mesh(geometry, wireframeMaterial);
-            hologramGroup.add(wireframeMesh);
-        }
-        
-        // Advanced glow effect with multiple layers
-        function createAdvancedGlowEffect() {
-            // Create multiple glow layers for depth
-            const glowLayers = [
-                { size: 500, distance: -150, intensity: 0.3, color: 0x00ffff },
-                { size: 550, distance: -200, intensity: 0.2, color: 0xff00ff },
-                { size: 600, distance: -250, intensity: 0.1, color: 0x0088ff }
-            ];
-            
-            glowLayers.forEach((layer, index) => {
-                const geometry = new THREE.PlaneGeometry(layer.size, layer.size * 0.56);
-                
-                const glowMat = new THREE.ShaderMaterial({
-                    uniforms: {
-                        time: { value: 0 },
-                        color: { value: new THREE.Color(layer.color) },
-                        intensity: { value: layer.intensity }
-                    },
-                    vertexShader: `
-                        varying vec2 vUv;
-                        void main() {
-                            vUv = uv;
-                            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                        }
-                    `,
-                    fragmentShader: `
-                        varying vec2 vUv;
-                        uniform float time;
-                        uniform vec3 color;
-                        uniform float intensity;
-                        
-                        void main() {
-                            vec2 center = vec2(0.5, 0.5);
-                            float dist = distance(vUv, center);
-                            
-                            float glow = 1.0 - smoothstep(0.0, 0.7, dist);
-                            glow = pow(glow, 3.0);
-                            
-                            vec3 finalColor = color * glow;
-                            
-                            float pulse = sin(time * 2.0 + float(${index}) * 1.57) * 0.5 + 0.5;
-                            float alpha = glow * intensity * (0.7 + pulse * 0.3);
-                            
-                            gl_FragColor = vec4(finalColor, alpha);
-                        }
-                    `,
-                    transparent: true,
-                    blending: THREE.AdditiveBlending,
-                    depthWrite: false,
-                    side: THREE.DoubleSide
-                });
-                
-                const glowPlane = new THREE.Mesh(geometry, glowMat);
-                glowPlane.position.z = layer.distance;
-                glowPlane.userData = { material: glowMat };
-                hologramGroup.add(glowPlane);
-            });
-        }
-        
-        // Create advanced background
-        function createAdvancedBackground() {
-            // Dynamic grid
-            const gridHelper = new THREE.GridHelper(3000, 60, 0x00ffff, 0x003366);
-            gridHelper.position.y = -250;
-            scene.add(gridHelper);
-            
-            // Floating particles
-            const particleCount = 1000;
-            const particleGeometry = new THREE.BufferGeometry();
-            const particlePositions = new Float32Array(particleCount * 3);
-            const particleSizes = new Float32Array(particleCount);
-            
-            for (let i = 0; i < particleCount; i++) {
-                particlePositions[i * 3] = (Math.random() - 0.5) * 2000;
-                particlePositions[i * 3 + 1] = (Math.random() - 0.5) * 2000;
-                particlePositions[i * 3 + 2] = (Math.random() - 0.5) * 2000;
-                particleSizes[i] = Math.random() * 3 + 1;
-            }
-            
-            particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
-            particleGeometry.setAttribute('size', new THREE.BufferAttribute(particleSizes, 1));
-            
-            const particleMaterial = new THREE.ShaderMaterial({
-                uniforms: {
-                    time: { value: 0 },
-                    color: { value: new THREE.Color(0x00ffff) }
-                },
-                vertexShader: `
-                    attribute float size;
-                    varying float vSize;
-                    uniform float time;
-                    
-                    void main() {
-                        vSize = size;
-                        vec3 pos = position;
-                        pos.y += sin(time + position.x * 0.01) * 20.0;
-                        
-                        vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
-                        gl_PointSize = size * (300.0 / -mvPosition.z);
-                        gl_Position = projectionMatrix * mvPosition;
-                    }
-                `,
-                fragmentShader: `
-                    uniform vec3 color;
-                    uniform float time;
-                    varying float vSize;
-                    
-                    void main() {
-                        float dist = length(gl_PointCoord - vec2(0.5));
-                        if (dist > 0.5) discard;
-                        
-                        float alpha = 1.0 - smoothstep(0.45, 0.5, dist);
-                        alpha *= 0.5 + sin(time * 2.0 + vSize) * 0.5;
-                        
-                        gl_FragColor = vec4(color, alpha * 0.6);
-                    }
-                `,
-                transparent: true,
-                blending: THREE.AdditiveBlending,
-                depthWrite: false
-            });
-            
-            const backgroundParticles = new THREE.Points(particleGeometry, particleMaterial);
-            scene.add(backgroundParticles);
-            
-            // Store for animation
-            window.backgroundElements = {
-                grid: gridHelper,
-                particles: backgroundParticles,
-                particleMaterial: particleMaterial
-            };
-        }
-        
-        // Animation loop
-        function animate() {
-            requestAnimationFrame(animate);
-            
-            const time = clock.getElapsedTime();
-            const delta = clock.getDelta();
-            
-            // Update materials
-            if (material) {
-                material.uniforms.time.value = time;
-                material.uniforms.depthScale.value = config.depth;
-                material.uniforms.scanlines.value = config.scanlines;
-                material.uniforms.glitchIntensity.value = config.glitch;
-                material.uniforms.chromaticAberration.value = config.chroma;
-                material.uniforms.distortion.value = config.effects.distortion ? 1.0 : 0.0;
-                material.uniforms.curlIntensity.value = config.effects.curl ? config.curl : 0.0;
-                material.uniforms.brightness.value = config.brightness;
-                material.uniforms.hologramIntensity.value = config.hologramIntensity;
-                material.uniforms.clarity.value = config.clarity;
-                material.uniforms.focus.value = config.focus;
-                
-                // Auto effects animation
-                if (config.autoEffects) {
-                    interactiveState.autoEffectTime += delta;
-                    const autoWave = Math.sin(interactiveState.autoEffectTime * 0.5);
-                    material.uniforms.hologramIntensity.value = 0.3 + autoWave * 0.3;
-                    material.uniforms.curlIntensity.value = 0.2 + Math.abs(autoWave) * 0.5;
-                }
-            }
-            
-            if (wireframeMaterial) {
-                wireframeMaterial.uniforms.time.value = time;
-                wireframeMaterial.uniforms.depthScale.value = config.depth;
-                wireframeMaterial.uniforms.brightness.value = config.brightness;
-            }
-            
-            // Update glow layers
-            hologramGroup.children.forEach(child => {
-                if (child.userData.material) {
-                    child.userData.material.uniforms.time.value = time;
-                }
-            });
-            
-            // Rotate hologram
-            if (hologramGroup && config.rotation > 0) {
-                hologramGroup.rotation.y += config.rotation * 0.01;
-            }
-            
-            // Animate lights
-            scene.children.forEach(child => {
-                if (child.isPointLight && child.userData.angle !== undefined) {
-                    const userData = child.userData;
-                    userData.angle += userData.speed * delta;
-                    child.position.x = Math.sin(userData.angle) * userData.radius;
-                    child.position.z = Math.cos(userData.angle) * userData.radius;
-                }
-            });
-            
-            // Animate background
-            if (window.backgroundElements) {
-                window.backgroundElements.particles.rotation.y += 0.0003;
-                window.backgroundElements.particles.rotation.x += 0.0001;
-                window.backgroundElements.particleMaterial.uniforms.time.value = time;
-            }
-            
-            // Update camera
-            if (window.updateCamera) {
-                window.updateCamera();
-            }
-            
-            // Update stats
-            updateStats();
-            
-            // Render
-            renderer.render(scene, camera);
-        }
-        
-        // Mouse controls with smoothing
-        function setupControls() {
-            let mouseX = 0, mouseY = 0;
-            let targetX = 0, targetY = 0;
-            
-            document.addEventListener('mousemove', (e) => {
-                mouseX = (e.clientX - window.innerWidth / 2) / window.innerWidth;
-                mouseY = (e.clientY - window.innerHeight / 2) / window.innerHeight;
-                
-                // Update shader mouse position
-                if (material) {
-                    material.uniforms.mousePosition.value.x = e.clientX / window.innerWidth;
-                    material.uniforms.mousePosition.value.y = 1.0 - (e.clientY / window.innerHeight);
-                }
-            });
-            
-            // Smooth camera movement
-            function updateCamera() {
-                targetX += (mouseX - targetX) * 0.02;
-                targetY += (mouseY - targetY) * 0.02;
-                
-                camera.position.x = targetX * 150;
-                camera.position.y = -targetY * 150;
-                camera.lookAt(scene.position);
-            }
-            
-            // Mouse wheel zoom
-            renderer.domElement.addEventListener('wheel', (e) => {
-                e.preventDefault();
-                camera.position.z += e.deltaY * 0.5;
-                camera.position.z = Math.max(200, Math.min(1000, camera.position.z));
-            });
-            
-            window.updateCamera = updateCamera;
-        }
-        
-        // Create test video
-        function createTestVideo() {
-            console.log('Creating enhanced test video...');
-            
-            const canvas = document.createElement('canvas');
-            canvas.width = 1280;
-            canvas.height = 720;
-            const ctx = canvas.getContext('2d');
-            
-            let frame = 0;
-            
-            function drawFrame() {
-                frame++;
-                const time = frame * 0.02;
-                
-                // Gradient background
-                const gradient = ctx.createRadialGradient(
-                    canvas.width/2, canvas.height/2, 0,
-                    canvas.width/2, canvas.height/2, canvas.width/2
+        function drawGradientBackground() {
+            for (let i = 0; i <= height; i++) {
+                let inter = map(i, 0, height, 0, 1);
+                let c = lerpColor(
+                    color(10, 10, 30 + sin(time) * 20),
+                    color(50 + sin(time + PI) * 30, 10, 80),
+                    inter
                 );
-                gradient.addColorStop(0, `hsl(${(time * 20) % 360}, 100%, 20%)`);
-                gradient.addColorStop(0.5, `hsl(${(time * 20 + 120) % 360}, 100%, 15%)`);
-                gradient.addColorStop(1, '#000011');
-                
-                ctx.fillStyle = gradient;
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                
-                // Multiple animated elements
-                for (let i = 0; i < 8; i++) {
-                    const x = (canvas.width / 2) + Math.sin(time + i * 0.8) * 250;
-                    const y = (canvas.height / 2) + Math.cos(time * 0.7 + i * 0.8) * 150;
-                    const radius = 30 + Math.sin(time * 2 + i) * 15;
-                    
-                    const circleGradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
-                    circleGradient.addColorStop(0, `hsla(${(time * 50 + i * 45) % 360}, 100%, 70%, 0.8)`);
-                    circleGradient.addColorStop(1, `hsla(${(time * 50 + i * 45) % 360}, 100%, 30%, 0.2)`);
-                    
-                    ctx.beginPath();
-                    ctx.arc(x, y, radius, 0, Math.PI * 2);
-                    ctx.fillStyle = circleGradient;
-                    ctx.fill();
-                }
-                
-                // Text with glow
-                ctx.save();
-                ctx.shadowColor = '#00ffff';
-                ctx.shadowBlur = 30;
-                ctx.fillStyle = '#ffffff';
-                ctx.font = 'bold 64px monospace';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText('QUANTUM HOLOGRAM', canvas.width / 2, canvas.height / 2);
-                
-                ctx.font = '24px monospace';
-                ctx.fillStyle = '#00ffff';
-                ctx.fillText('Enhanced Reality System v2.0', canvas.width / 2, canvas.height / 2 + 50);
-                ctx.restore();
-                
-                // Grid overlay
-                ctx.strokeStyle = `rgba(0, 255, 255, ${0.1 + Math.sin(time * 3) * 0.05})`;
-                ctx.lineWidth = 1;
-                for (let x = 0; x < canvas.width; x += 40) {
-                    ctx.beginPath();
-                    ctx.moveTo(x, 0);
-                    ctx.lineTo(x, canvas.height);
-                    ctx.stroke();
-                }
-                for (let y = 0; y < canvas.height; y += 40) {
-                    ctx.beginPath();
-                    ctx.moveTo(0, y);
-                    ctx.lineTo(canvas.width, y);
-                    ctx.stroke();
-                }
-                
-                requestAnimationFrame(drawFrame);
+                stroke(c);
+                line(0, i, width, i);
             }
-            
-            drawFrame();
-            
-            // Create video from canvas
-            const stream = canvas.captureStream(30);
-            
-            if (video) {
-                video.pause();
-                video.remove();
-            }
-            
-            video = document.createElement('video');
-            video.srcObject = stream;
-            video.loop = true;
-            video.muted = true;
-            video.style.display = 'none';
-            document.body.appendChild(video);
-            
-            video.play().then(() => {
-                createHologram(video);
-            }).catch(err => {
-                console.error('Failed to play test video:', err);
-            });
         }
-        
-        // Setup video with improved error handling
-        function setupVideo(src, isObjectURL = false) {
-            console.log('Setting up video:', src);
+
+        function drawMorphingCircle(wave) {
+            push();
+            noFill();
+            strokeWeight(2);
             
-            // Clean up previous video
-            if (video) {
-                video.pause();
-                video.src = '';
-                video.load();
-                video.remove();
-                video = null;
+            let morphedRadius = wave.radius + sin(time * 2 + wave.phase) * waveAmplitude;
+            
+            beginShape();
+            for (let angle = 0; angle < TWO_PI; angle += 0.1) {
+                let distortion = noise(cos(angle) * 2, sin(angle) * 2, time) * 50 * morphProgress;
+                let r = morphedRadius + distortion;
+                let x = cos(angle) * r;
+                let y = sin(angle) * r;
+                
+                // Apply wave distortion
+                x += sin(angle * 5 + time * 3) * 10 * morphProgress;
+                y += cos(angle * 5 + time * 3) * 10 * morphProgress;
+                
+                let alpha = map(sin(time + wave.phase), -1, 1, 50, 255);
+                stroke(red(wave.color), green(wave.color), blue(wave.color), alpha);
+                vertex(x, y);
+            }
+            endShape(CLOSE);
+            pop();
+        }
+
+        function drawCentralOrb() {
+            push();
+            translate(width/2, height/2);
+            
+            // Outer glow
+            for (let i = 5; i > 0; i--) {
+                let alpha = map(i, 0, 5, 100, 0);
+                fill(150, 100, 255, alpha * morphProgress);
+                noStroke();
+                let size = 100 + i * 20 + sin(time * 2) * 10;
+                ellipse(0, 0, size, size);
             }
             
-            video = document.createElement('video');
-            video.crossOrigin = 'anonymous';
-            video.loop = true;
-            video.muted = false;
-            video.playsInline = true;
-            video.volume = document.getElementById('volume').value / 100;
-            video.style.display = 'none';
-            video.setAttribute('playsinline', '');
-            video.setAttribute('webkit-playsinline', '');
+            // Inner core
+            fill(255, 255, 255, 200);
+            let coreSize = 50 + sin(time * 3) * 10;
+            ellipse(0, 0, coreSize * morphProgress, coreSize * morphProgress);
             
-            document.body.appendChild(video);
-            
-            let videoLoaded = false;
-            
-            video.addEventListener('loadedmetadata', () => {
-                // Setup timeline
-                document.getElementById('videoTimeline').style.display = 'block';
-                document.getElementById('videoSeek').max = video.duration;
-                document.getElementById('duration').textContent = formatTime(video.duration);
-            });
-            
-            video.addEventListener('timeupdate', () => {
-                if (document.getElementById('videoSeek')) {
-                    document.getElementById('videoSeek').value = video.currentTime;
-                    document.getElementById('currentTime').textContent = formatTime(video.currentTime);
-                }
-            });
-            
-            video.addEventListener('canplay', () => {
-                if (!videoLoaded) {
-                    console.log('Video can play');
-                    videoLoaded = true;
-                    
-                    const playPromise = video.play();
-                    
-                    if (playPromise !== undefined) {
-                        playPromise.then(() => {
-                            console.log('Video playing successfully');
-                            createHologram(video);
-                            setupVideoControls();
-                        }).catch(error => {
-                            console.log('Autoplay prevented:', error);
-                            document.getElementById('loading').textContent = 'CLICK ANYWHERE TO START';
-                            
-                            const startVideo = () => {
-                                video.play().then(() => {
-                                    createHologram(video);
-                                    setupVideoControls();
-                                }).catch(err => {
-                                    console.error('Play failed:', err);
-                                });
-                                document.removeEventListener('click', startVideo);
-                            };
-                            
-                            document.addEventListener('click', startVideo);
-                        });
+            // Rotating rings
+            strokeWeight(2);
+            noFill();
+            for (let i = 0; i < 3; i++) {
+                push();
+                rotate(time + i * PI/3);
+                stroke(colorPalette[i % colorPalette.length]);
+                let ringSize = 80 + i * 30;
+                ellipse(0, 0, ringSize * morphProgress, ringSize * morphProgress * 0.6);
+                pop();
+            }
+            pop();
+        }
+
+        function drawConnections() {
+            strokeWeight(0.5);
+            for (let i = 0; i < particles.length; i++) {
+                for (let j = i + 1; j < particles.length; j++) {
+                    let d = dist(particles[i].pos.x, particles[i].pos.y, 
+                               particles[j].pos.x, particles[j].pos.y);
+                    if (d < 100) {
+                        let alpha = map(d, 0, 100, 100, 0);
+                        stroke(100, 255, 255, alpha * morphProgress);
+                        line(particles[i].pos.x, particles[i].pos.y,
+                             particles[j].pos.x, particles[j].pos.y);
                     }
                 }
-            });
-            
-            video.addEventListener('error', (e) => {
-                console.error('Video error:', e);
-                const errorMessage = video.error ? video.error.message : 'Unknown error';
-                document.getElementById('loading').textContent = 'VIDEO ERROR: ' + errorMessage;
-            });
-            
-            video.src = src;
-            video.load();
+            }
         }
-        
-        // Setup video controls after video is loaded
-        function setupVideoControls() {
-            if (!video) return;
+
+        function drawGlowingText() {
+            push();
+            textAlign(CENTER, CENTER);
+            textSize(48);
             
-            // Video seek control
-            const videoSeek = document.getElementById('videoSeek');
-            if (videoSeek) {
-                videoSeek.addEventListener('input', (e) => {
-                    if (video) {
-                        video.currentTime = e.target.value;
-                    }
+            // Text glow effect
+            for (let i = 5; i > 0; i--) {
+                let alpha = map(i, 0, 5, 255, 0);
+                fill(255, 100, 200, alpha * 0.3);
+                text("REALITY ENHANCED", width/2, height/4);
+            }
+            
+            fill(255, 255, 255);
+            text("REALITY ENHANCED", width/2, height/4);
+            
+            textSize(24);
+            let pulse = sin(time * 4) * 0.2 + 0.8;
+            fill(100, 255, 255, 255 * pulse);
+            text("Circle Target Detected", width/2, height/4 + 60);
+            pop();
+        }
+
+        function generateFlowField() {
+            let xoff = 0;
+            for (let i = 0; i < flowFieldCols; i++) {
+                let yoff = 0;
+                flowField[i] = [];
+                for (let j = 0; j < flowFieldRows; j++) {
+                    let angle = noise(xoff, yoff, time * 0.1) * TWO_PI * 2;
+                    flowField[i][j] = p5.Vector.fromAngle(angle);
+                    yoff += 0.1;
+                }
+                xoff += 0.1;
+            }
+        }
+
+        function drawFlowField() {
+            strokeWeight(1);
+            for (let i = 0; i < flowFieldCols; i += 2) {
+                for (let j = 0; j < flowFieldRows; j += 2) {
+                    let x = i * flowFieldScale;
+                    let y = j * flowFieldScale;
+                    let v = flowField[i][j];
+                    
+                    push();
+                    translate(x, y);
+                    stroke(255, 50, 150, 50);
+                    rotate(v.heading());
+                    line(0, 0, flowFieldScale * 0.5, 0);
+                    pop();
+                }
+            }
+        }
+
+        // Particle class
+        class Particle {
+            constructor(x, y) {
+                this.pos = createVector(x, y);
+                this.vel = createVector(random(-2, 2), random(-2, 2));
+                this.acc = createVector(0, 0);
+                this.maxSpeed = 4;
+                this.color = random(colorPalette);
+                this.size = random(3, 8);
+                this.lifespan = 255;
+                this.trail = [];
+                this.maxTrailLength = 10;
+            }
+            
+            followField(field) {
+                let x = floor(this.pos.x / flowFieldScale);
+                let y = floor(this.pos.y / flowFieldScale);
+                
+                if (x >= 0 && x < flowFieldCols && y >= 0 && y < flowFieldRows) {
+                    let force = field[x][y];
+                    this.applyForce(force);
+                }
+            }
+            
+            applyForce(force) {
+                this.acc.add(force);
+            }
+            
+            update(attractors, morph) {
+                // Add trail point
+                this.trail.push(createVector(this.pos.x, this.pos.y));
+                if (this.trail.length > this.maxTrailLength) {
+                    this.trail.shift();
+                }
+                
+                // Apply attraction to circular points
+                for (let attractor of attractors) {
+                    let force = p5.Vector.sub(attractor, this.pos);
+                    let d = force.mag();
+                    d = constrain(d, 5, 200);
+                    let strength = (morph * 20) / (d * d);
+                    force.setMag(strength);
+                    this.applyForce(force);
+                }
+                
+                // Add some randomness
+                let randomForce = createVector(random(-0.5, 0.5), random(-0.5, 0.5));
+                this.applyForce(randomForce);
+                
+                this.vel.add(this.acc);
+                this.vel.limit(this.maxSpeed);
+                this.pos.add(this.vel);
+                this.acc.mult(0);
+                
+                // Wrap edges
+                if (this.pos.x < 0) this.pos.x = width;
+                if (this.pos.x > width) this.pos.x = 0;
+                if (this.pos.y < 0) this.pos.y = height;
+                if (this.pos.y > height) this.pos.y = 0;
+                
+                // Regenerate if needed
+                this.lifespan -= 0.5;
+                if (this.lifespan < 0) {
+                    this.respawn();
+                }
+            }
+            
+            display() {
+                // Draw trail
+                noFill();
+                strokeWeight(1);
+                for (let i = 0; i < this.trail.length - 1; i++) {
+                    let alpha = map(i, 0, this.trail.length, 0, 100);
+                    stroke(red(this.color), green(this.color), blue(this.color), alpha);
+                    line(this.trail[i].x, this.trail[i].y, 
+                         this.trail[i + 1].x, this.trail[i + 1].y);
+                }
+                
+                // Draw particle with glow
+                push();
+                drawingContext.shadowBlur = 20;
+                drawingContext.shadowColor = this.color.toString();
+                
+                fill(this.color);
+                noStroke();
+                let adjustedSize = this.size * (1 + sin(time * 3) * 0.2);
+                ellipse(this.pos.x, this.pos.y, adjustedSize, adjustedSize);
+                pop();
+            }
+            
+            respawn() {
+                this.pos = createVector(random(width), random(height));
+                this.vel = createVector(random(-2, 2), random(-2, 2));
+                this.lifespan = 255;
+                this.trail = [];
+            }
+        }
+
+        // Listen for AR target detection
+        window.addEventListener('targetFound', () => {
+            targetDetected = true;
+            // Regenerate flow field on detection
+            generateFlowField();
+        });
+
+        window.addEventListener('targetLost', () => {
+            targetDetected = false;
+        });
+    </script>
+
+    <!-- A-Frame Component -->
+    <script>
+        AFRAME.registerComponent('canvas-updater', {
+            dependencies: ['geometry', 'material'],
+            tick: function () {
+                var material, el = this.el;
+                material = el.getObject3D('mesh').material;
+                if (!material.map) { return; }
+                material.map.needsUpdate = true;
+            }
+        });
+
+        // Custom target detection events
+        AFRAME.registerComponent('target-events', {
+            init: function () {
+                this.el.addEventListener('targetFound', () => {
+                    window.dispatchEvent(new Event('targetFound'));
                 });
-            }
-        }
-        
-        // Update stats
-        function updateStats() {
-            stats.frames++;
-            const currentTime = performance.now();
-            if (currentTime >= stats.lastTime + 1000) {
-                stats.fps = Math.round(stats.frames * 1000 / (currentTime - stats.lastTime));
-                document.getElementById('fps').textContent = stats.fps;
-                stats.lastTime = currentTime;
-                stats.frames = 0;
-                
-                if (renderer.info) {
-                    document.getElementById('drawCalls').textContent = renderer.info.render.calls || 0;
-                    const memory = (renderer.info.memory.geometries + renderer.info.memory.textures) || 0;
-                    document.getElementById('gpuMemory').textContent = memory.toFixed(1);
-                }
-            }
-        }
-        
-        // Apply preset with all parameters
-        function applyPreset(preset) {
-            // Update all config values
-            Object.keys(preset).forEach(key => {
-                if (key !== 'name' && config.hasOwnProperty(key)) {
-                    config[key] = preset[key];
-                    
-                    // Update corresponding slider
-                    let sliderId = key;
-                    if (key === 'hologramIntensity') {
-                        const slider = document.getElementById('hologramIntensity');
-                        if (slider) {
-                            slider.value = preset[key] * 100;
-                            document.getElementById('hologramIntensityValue').textContent = (preset[key] * 100) + '%';
-                        }
-                    } else {
-                        const slider = document.getElementById(sliderId);
-                        if (slider) {
-                            slider.value = preset[key];
-                            const valueDisplay = document.getElementById(sliderId + 'Value');
-                            if (valueDisplay) {
-                                valueDisplay.textContent = preset[key];
-                            }
-                        }
-                    }
-                }
-            });
-            
-            // Update materials immediately
-            if (material) {
-                material.uniforms.hologramIntensity.value = config.hologramIntensity;
-                material.uniforms.clarity.value = config.clarity;
-                material.uniforms.focus.value = config.focus;
-                material.uniforms.brightness.value = config.brightness;
-                material.uniforms.depthScale.value = config.depth;
-                material.uniforms.scanlines.value = config.scanlines;
-                material.uniforms.glitchIntensity.value = config.glitch;
-                material.uniforms.chromaticAberration.value = config.chroma;
-            }
-            
-            // Recreate hologram if needed for significant changes
-            if (video && video.readyState >= 2 && (preset.density || preset.resolution)) {
-                createHologram(video);
-            }
-            
-            showNotification(`Preset Applied: ${preset.name || 'Custom'}`, 2000);
-        }
-        
-        // WebXR support
-        async function startXR() {
-            if (!navigator.xr) return;
-            
-            try {
-                const session = await navigator.xr.requestSession('immersive-vr');
-                renderer.xr.enabled = true;
-                renderer.xr.setSession(session);
-                
-                showNotification('Entering VR Mode', 2000);
-            } catch (err) {
-                console.error('XR session failed:', err);
-                showNotification('VR not available', 3000);
-            }
-        }
-        
-        // Snapshot function
-        function takeSnapshot() {
-            renderer.render(scene, camera);
-            const dataURL = renderer.domElement.toDataURL('image/png');
-            
-            const link = document.createElement('a');
-            link.download = `hologram-snapshot-${Date.now()}.png`;
-            link.href = dataURL;
-            link.click();
-            
-            showNotification('Snapshot saved!', 2000);
-        }
-        
-        // Format time for video timeline
-        function formatTime(seconds) {
-            const mins = Math.floor(seconds / 60);
-            const secs = Math.floor(seconds % 60);
-            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-        }
-        
-        // Gesture control functions
-        function startGestureControl() {
-            document.addEventListener('mousemove', handleGesture);
-            document.addEventListener('touchmove', handleTouch);
-            document.addEventListener('touchstart', handleTouchStart);
-            document.addEventListener('touchend', handleTouchEnd);
-        }
-        
-        function stopGestureControl() {
-            document.removeEventListener('mousemove', handleGesture);
-            document.removeEventListener('touchmove', handleTouch);
-            document.removeEventListener('touchstart', handleTouchStart);
-            document.removeEventListener('touchend', handleTouchEnd);
-        }
-        
-        function handleGesture(e) {
-            if (!config.gestureControl) return;
-            
-            const x = e.clientX / window.innerWidth;
-            const y = e.clientY / window.innerHeight;
-            
-            // Add to trail
-            interactiveState.mouseTrail.push({ x, y, time: Date.now() });
-            if (interactiveState.mouseTrail.length > 10) {
-                interactiveState.mouseTrail.shift();
-            }
-            
-            // Detect gestures
-            if (interactiveState.mouseTrail.length > 5) {
-                const deltaX = interactiveState.mouseTrail[9].x - interactiveState.mouseTrail[0].x;
-                const deltaY = interactiveState.mouseTrail[9].y - interactiveState.mouseTrail[0].y;
-                
-                // Swipe detection
-                if (Math.abs(deltaX) > 0.3) {
-                    config.rotation = deltaX > 0 ? 0.3 : -0.3;
-                    setTimeout(() => { config.rotation = 0.1; }, 1000);
-                }
-                
-                // Vertical gesture for depth
-                if (Math.abs(deltaY) > 0.2) {
-                    config.depth = 120 + deltaY * 200;
-                    document.getElementById('depth').value = config.depth;
-                    document.getElementById('depthValue').textContent = Math.round(config.depth);
-                }
-            }
-            
-            // Dynamic effects based on position
-            if (material) {
-                material.uniforms.touchPoints.value.x = x;
-                material.uniforms.touchPoints.value.y = 1.0 - y;
-            }
-        }
-        
-        function handleTouch(e) {
-            if (!config.gestureControl) return;
-            
-            if (e.touches.length === 2) {
-                // Pinch to zoom
-                const touch1 = e.touches[0];
-                const touch2 = e.touches[1];
-                const distance = Math.hypot(
-                    touch2.clientX - touch1.clientX,
-                    touch2.clientY - touch1.clientY
-                );
-                
-                if (interactiveState.lastPinchDistance > 0) {
-                    const delta = distance - interactiveState.lastPinchDistance;
-                    camera.position.z -= delta * 2;
-                    camera.position.z = Math.max(200, Math.min(1000, camera.position.z));
-                }
-                
-                interactiveState.lastPinchDistance = distance;
-            }
-        }
-        
-        function handleTouchStart(e) {
-            if (e.touches.length === 2) {
-                interactiveState.lastPinchDistance = Math.hypot(
-                    e.touches[1].clientX - e.touches[0].clientX,
-                    e.touches[1].clientY - e.touches[0].clientY
-                );
-            }
-        }
-        
-        function handleTouchEnd(e) {
-            if (e.touches.length < 2) {
-                interactiveState.lastPinchDistance = 0;
-            }
-        }
-        
-        // Recording functions
-        let mediaRecorder;
-        let recordedChunks = [];
-        
-        function startRecording() {
-            try {
-                const stream = renderer.domElement.captureStream(30);
-                mediaRecorder = new MediaRecorder(stream, {
-                    mimeType: 'video/webm;codecs=vp9',
-                    videoBitsPerSecond: 8000000
+                this.el.addEventListener('targetLost', () => {
+                    window.dispatchEvent(new Event('targetLost'));
                 });
-                
-                recordedChunks = [];
-                
-                mediaRecorder.ondataavailable = (event) => {
-                    if (event.data.size > 0) {
-                        recordedChunks.push(event.data);
-                    }
-                };
-                
-                mediaRecorder.onstop = () => {
-                    const blob = new Blob(recordedChunks, { type: 'video/webm' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `hologram-recording-${Date.now()}.webm`;
-                    a.click();
-                    URL.revokeObjectURL(url);
-                    showNotification('Recording Saved!', 2000);
-                };
-                
-                mediaRecorder.start();
-            } catch (err) {
-                console.error('Recording failed:', err);
-                showNotification('Recording not supported in this browser', 2000);
-                config.recording = false;
-                document.getElementById('recordMode').classList.remove('active');
-            }
-        }
-        
-        function stopRecording() {
-            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                mediaRecorder.stop();
-            }
-        }
-        
-        // Enhanced mouse controls with smoothing and physics
-        function setupControls() {
-            let mouseX = 0, mouseY = 0;
-            let targetX = 0, targetY = 0;
-            let velocityX = 0, velocityY = 0;
-            
-            document.addEventListener('mousemove', (e) => {
-                mouseX = (e.clientX - window.innerWidth / 2) / window.innerWidth;
-                mouseY = (e.clientY - window.innerHeight / 2) / window.innerHeight;
-                
-                // Update shader mouse position
-                if (material) {
-                    material.uniforms.mousePosition.value.x = e.clientX / window.innerWidth;
-                    material.uniforms.mousePosition.value.y = 1.0 - (e.clientY / window.innerHeight);
-                }
-                
-                // Create ripple effect on click
-                if (e.buttons === 1) {
-                    createRippleEffect(e.clientX, e.clientY);
-                }
-            });
-            
-            // Smooth camera movement with physics
-            function updateCamera() {
-                // Apply smoothing with velocity
-                velocityX += (mouseX - targetX) * 0.02;
-                velocityY += (mouseY - targetY) * 0.02;
-                
-                // Apply damping
-                velocityX *= 0.9;
-                velocityY *= 0.9;
-                
-                targetX += velocityX;
-                targetY += velocityY;
-                
-                camera.position.x = targetX * 150;
-                camera.position.y = -targetY * 150;
-                
-                // Add subtle rotation based on movement
-                if (config.gestureControl) {
-                    camera.rotation.z = targetX * 0.05;
-                }
-                
-                camera.lookAt(scene.position);
-            }
-            
-            // Mouse wheel zoom with smooth animation
-            let zoomVelocity = 0;
-            let targetZoom = camera.position.z;
-            
-            renderer.domElement.addEventListener('wheel', (e) => {
-                e.preventDefault();
-                zoomVelocity += e.deltaY * 0.3;
-            });
-            
-            // Update zoom in animation loop
-            function updateZoom() {
-                zoomVelocity *= 0.9; // Damping
-                targetZoom += zoomVelocity;
-                targetZoom = Math.max(200, Math.min(1000, targetZoom));
-                camera.position.z += (targetZoom - camera.position.z) * 0.1;
-            }
-            
-            window.updateCamera = () => {
-                updateCamera();
-                updateZoom();
-            };
-        }
-        
-        // Create ripple effect
-        function createRippleEffect(x, y) {
-            const rippleGeometry = new THREE.RingGeometry(10, 15, 32);
-            const rippleMaterial = new THREE.MeshBasicMaterial({
-                color: 0x00ffff,
-                transparent: true,
-                opacity: 0.5,
-                side: THREE.DoubleSide
-            });
-            
-            const ripple = new THREE.Mesh(rippleGeometry, rippleMaterial);
-            
-            // Convert screen coordinates to world coordinates
-            const vector = new THREE.Vector3(
-                (x / window.innerWidth) * 2 - 1,
-                -(y / window.innerHeight) * 2 + 1,
-                0.5
-            );
-            
-            vector.unproject(camera);
-            const dir = vector.sub(camera.position).normalize();
-            const distance = -camera.position.z / dir.z;
-            const pos = camera.position.clone().add(dir.multiplyScalar(distance));
-            
-            ripple.position.copy(pos);
-            scene.add(ripple);
-            
-            // Animate ripple
-            const animateRipple = () => {
-                ripple.scale.x += 0.1;
-                ripple.scale.y += 0.1;
-                ripple.material.opacity -= 0.02;
-                
-                if (ripple.material.opacity <= 0) {
-                    scene.remove(ripple);
-                    ripple.geometry.dispose();
-                    ripple.material.dispose();
-                } else {
-                    requestAnimationFrame(animateRipple);
-                }
-            };
-            
-            animateRipple();
-        }
-        
-        // Setup all event listeners
-        function setupEventListeners() {
-            // Window resize
-            window.addEventListener('resize', () => {
-                camera.aspect = window.innerWidth / window.innerHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(window.innerWidth, window.innerHeight);
-                
-                if (material) {
-                    material.uniforms.resolution.value.set(window.innerWidth, window.innerHeight);
-                }
-            });
-            
-            // Toggle panel
-            const toggleBtn = document.getElementById('togglePanel');
-            const controlPanel = document.getElementById('controlPanel');
-            
-            toggleBtn.addEventListener('click', () => {
-                controlPanel.classList.toggle('visible');
-                toggleBtn.classList.toggle('active');
-                
-                const isVisible = controlPanel.classList.contains('visible');
-                showNotification(isVisible ? 'Control Panel Opened' : 'Control Panel Closed', 1500);
-            });
-            
-            // File input
-            document.getElementById('fileInput').addEventListener('change', (e) => {
-                const file = e.target.files[0];
-                if (file && file.type.startsWith('video/')) {
-                    document.getElementById('loading').style.display = 'block';
-                    document.getElementById('loading').innerHTML = 
-                        '<div>LOADING VIDEO...</div>' +
-                        '<div style="font-size: 14px; margin-top: 10px;">Processing: ' + file.name + '</div>';
-                    
-                    const url = URL.createObjectURL(file);
-                    setupVideo(url);
-                }
-            });
-            
-            // Demo video button
-            document.getElementById('defaultVideo').addEventListener('click', () => {
-                document.getElementById('loading').style.display = 'block';
-                document.getElementById('loading').innerHTML = 
-                    '<div>GENERATING DEMO...</div>' +
-                    '<div style="font-size: 14px; margin-top: 10px;">Creating Quantum Patterns</div>';
-                createTestVideo();
-            });
-            
-            // Test system button
-            document.getElementById('testSystem').addEventListener('click', () => {
-                document.getElementById('loading').style.display = 'block';
-                document.getElementById('loading').innerHTML = 
-                    '<div>SYSTEM DIAGNOSTICS</div>' +
-                    '<div style="font-size: 14px; margin-top: 10px;">Running Performance Test</div>';
-                
-                // Run performance test
-                const testCanvas = document.createElement('canvas');
-                testCanvas.width = 1920;
-                testCanvas.height = 1080;
-                const ctx = testCanvas.getContext('2d');
-                
-                function drawTestPattern() {
-                    const time = Date.now() * 0.001;
-                    
-                    // Create complex gradient
-                    const gradient = ctx.createConicGradient(0, testCanvas.width/2, testCanvas.height/2);
-                    for (let i = 0; i < 12; i++) {
-                        gradient.addColorStop(i/12, `hsl(${(time * 50 + i * 30) % 360}, 100%, 50%)`);
-                    }
-                    
-                    ctx.fillStyle = gradient;
-                    ctx.fillRect(0, 0, testCanvas.width, testCanvas.height);
-                    
-                    // Test pattern
-                    ctx.fillStyle = 'white';
-                    ctx.font = 'bold 72px monospace';
-                    ctx.textAlign = 'center';
-                    ctx.fillText('SYSTEM TEST', testCanvas.width/2, testCanvas.height/2);
-                    
-                    ctx.font = '36px monospace';
-                    ctx.fillText(`GPU: ${renderer.capabilities.maxTextures} textures`, testCanvas.width/2, testCanvas.height/2 + 60);
-                    ctx.fillText(`Resolution: ${testCanvas.width}x${testCanvas.height}`, testCanvas.width/2, testCanvas.height/2 + 100);
-                    
-                    requestAnimationFrame(drawTestPattern);
-                }
-                
-                drawTestPattern();
-                
-                const stream = testCanvas.captureStream(60);
-                const testVideo = document.createElement('video');
-                testVideo.srcObject = stream;
-                testVideo.loop = true;
-                testVideo.muted = true;
-                testVideo.play();
-                
-                setTimeout(() => {
-                    createHologram(testVideo);
-                    showNotification('System Test Complete - All Systems Operational', 3000);
-                }, 500);
-            });
-            
-            // Sliders
-            document.getElementById('volume').addEventListener('input', (e) => {
-                const volume = e.target.value;
-                document.getElementById('volumeValue').textContent = volume + '%';
-                if (video) {
-                    video.volume = volume / 100;
-                    video.muted = volume == 0;
-                }
-            });
-            
-            document.getElementById('density').addEventListener('input', (e) => {
-                config.density = parseInt(e.target.value);
-                document.getElementById('densityValue').textContent = config.density;
-                if (video && video.readyState >= 2) {
-                    createHologram(video);
-                }
-            });
-            
-            document.getElementById('resolution').addEventListener('input', (e) => {
-                config.resolution = parseInt(e.target.value);
-                document.getElementById('resolutionValue').textContent = config.resolution;
-                if (video && video.readyState >= 2) {
-                    createHologram(video);
-                }
-            });
-            
-            document.getElementById('scanlines').addEventListener('input', (e) => {
-                config.scanlines = parseFloat(e.target.value);
-                document.getElementById('scanValue').textContent = config.scanlines;
-            });
-            
-            document.getElementById('glitch').addEventListener('input', (e) => {
-                config.glitch = parseFloat(e.target.value);
-                document.getElementById('glitchValue').textContent = config.glitch;
-            });
-            
-            document.getElementById('chroma').addEventListener('input', (e) => {
-                config.chroma = parseFloat(e.target.value);
-                document.getElementById('chromaValue').textContent = config.chroma;
-            });
-            
-            document.getElementById('depth').addEventListener('input', (e) => {
-                config.depth = parseFloat(e.target.value);
-                document.getElementById('depthValue').textContent = config.depth;
-            });
-            
-            document.getElementById('rotation').addEventListener('input', (e) => {
-                config.rotation = parseFloat(e.target.value);
-                document.getElementById('rotationValue').textContent = config.rotation;
-            });
-            
-            document.getElementById('curl').addEventListener('input', (e) => {
-                config.curl = parseFloat(e.target.value);
-                document.getElementById('curlValue').textContent = config.curl;
-            });
-            
-            document.getElementById('brightness').addEventListener('input', (e) => {
-                config.brightness = parseFloat(e.target.value);
-                document.getElementById('brightnessValue').textContent = config.brightness;
-            });
-            
-            document.getElementById('hologramIntensity').addEventListener('input', (e) => {
-                config.hologramIntensity = parseFloat(e.target.value) / 100;
-                document.getElementById('hologramIntensityValue').textContent = e.target.value + '%';
-                
-                // Adjust other effects proportionally
-                if (config.hologramIntensity < 0.3) {
-                    // Cinema mode - reduce effects
-                    config.scanlines = config.scanlines * config.hologramIntensity;
-                    config.glitch = config.glitch * config.hologramIntensity;
-                    config.chroma = config.chroma * config.hologramIntensity;
-                    showNotification('Cinema Mode - Enhanced Clarity', 1500);
-                } else if (config.hologramIntensity > 0.7) {
-                    showNotification('Full Hologram Mode', 1500);
-                }
-            });
-            
-            document.getElementById('clarity').addEventListener('input', (e) => {
-                config.clarity = parseFloat(e.target.value);
-                document.getElementById('clarityValue').textContent = config.clarity;
-            });
-            
-            document.getElementById('focus').addEventListener('input', (e) => {
-                config.focus = parseFloat(e.target.value);
-                document.getElementById('focusValue').textContent = config.focus;
-            });
-            
-            // Presets - Fixed values
-            document.getElementById('presetCyber').addEventListener('click', () => {
-                applyPreset({
-                    name: 'Cyber Mode',
-                    density: 4, 
-                    resolution: 3,
-                    scanlines: 0.8, 
-                    glitch: 0.5,
-                    chroma: 1.5, 
-                    depth: 200, 
-                    rotation: 0.3,
-                    curl: 1.0,
-                    brightness: 1.5,
-                    hologramIntensity: 0.8,
-                    clarity: 0.2,
-                    focus: 0.5
-                });
-                document.getElementById('modeIndicator').textContent = 'CYBER MODE';
-                document.getElementById('modeIndicator').classList.add('visible');
-                setTimeout(() => {
-                    document.getElementById('modeIndicator').classList.remove('visible');
-                }, 3000);
-            });
-            
-            document.getElementById('presetMatrix').addEventListener('click', () => {
-                applyPreset({
-                    name: 'Matrix Mode',
-                    density: 5, 
-                    resolution: 2,
-                    scanlines: 1.0, 
-                    glitch: 0.7,
-                    chroma: 0.3, 
-                    depth: 250, 
-                    rotation: 0.1,
-                    curl: 0.3,
-                    brightness: 0.8,
-                    hologramIntensity: 0.9,
-                    clarity: 0.1,
-                    focus: 0.5
-                });
-                document.getElementById('modeIndicator').textContent = 'MATRIX MODE';
-                document.getElementById('modeIndicator').classList.add('visible');
-                setTimeout(() => {
-                    document.getElementById('modeIndicator').classList.remove('visible');
-                }, 3000);
-            });
-            
-            document.getElementById('presetClean').addEventListener('click', () => {
-                applyPreset({
-                    name: 'Ultra HD Mode',
-                    density: 4, 
-                    resolution: 4,
-                    scanlines: 0, 
-                    glitch: 0,
-                    chroma: 0, 
-                    depth: 100, 
-                    rotation: 0.2,
-                    curl: 0.2,
-                    brightness: 1.3,
-                    hologramIntensity: 0.3,
-                    clarity: 0.7,
-                    focus: 0.5
-                });
-                document.getElementById('modeIndicator').textContent = 'ULTRA HD MODE';
-                document.getElementById('modeIndicator').classList.add('visible');
-                setTimeout(() => {
-                    document.getElementById('modeIndicator').classList.remove('visible');
-                }, 3000);
-            });
-            
-            document.getElementById('presetQuantum').addEventListener('click', () => {
-                applyPreset({
-                    name: 'Quantum Mode',
-                    density: 5, 
-                    resolution: 3,
-                    scanlines: 0.3, 
-                    glitch: 0.2,
-                    chroma: 0.8, 
-                    depth: 180, 
-                    rotation: 0.15,
-                    curl: 1.5,
-                    brightness: 1.4,
-                    hologramIntensity: 0.7, // CORRECTED
-                    clarity: 0.3,           // CORRECTED
-                    focus: 0.5              // CORRECTED
-                });
-                document.getElementById('modeIndicator').textContent = 'QUANTUM MODE';
-                document.getElementById('modeIndicator').classList.add('visible');
-                setTimeout(() => {
-                    document.getElementById('modeIndicator').classList.remove('visible');
-                }, 3000);
-            });
-            
-            document.getElementById('presetCinema').addEventListener('click', () => {
-                applyPreset({
-                    name: 'Cinema Mode',
-                    density: 2, 
-                    resolution: 4,
-                    scanlines: 0, 
-                    glitch: 0,
-                    chroma: 0.1, 
-                    depth: 50, 
-                    rotation: 0,
-                    curl: 0,
-                    brightness: 1.5,
-                    hologramIntensity: 0.1,
-                    clarity: 0.9,
-                    focus: 0.5
-                });
-                document.getElementById('modeIndicator').textContent = 'CINEMA MODE - MAXIMUM CLARITY';
-                document.getElementById('modeIndicator').style.color = '#ffaa00';
-                document.getElementById('modeIndicator').classList.add('visible');
-                setTimeout(() => {
-                    document.getElementById('modeIndicator').classList.remove('visible');
-                    document.getElementById('modeIndicator').style.color = '#ff00ff';
-                }, 3000);
-            });
-            
-            // Effect toggles
-            document.querySelectorAll('.toggle-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    const effect = e.target.dataset.effect;
-                    config.effects[effect] = !config.effects[effect];
-                    e.target.classList.toggle('active');
-                    
-                    switch(effect) {
-                        case 'particles': 
-                            if (particles) particles.visible = config.effects.particles; 
-                            break;
-                        case 'wireframe': 
-                            if (wireframeMesh) wireframeMesh.visible = config.effects.wireframe; 
-                            break;
-                        case 'glow': 
-                            hologramGroup.children.forEach(child => {
-                                if (child.userData.material) {
-                                    child.visible = config.effects.glow;
-                                }
-                            });
-                            break;
-                        case 'curl':
-                        case 'distortion':
-                        case 'bloom':
-                            // These are handled in the shader
-                            if (video && video.readyState >= 2) {
-                                createHologram(video);
-                            }
-                            break;
-                    }
-                    
-                    showNotification(`${effect.charAt(0).toUpperCase() + effect.slice(1)} ${config.effects[effect] ? 'Enabled' : 'Disabled'}`, 1500);
-                });
-            });
-            
-            // Quick toolbar buttons
-            document.getElementById('playPause').addEventListener('click', () => {
-                if (video) {
-                    if (video.paused) {
-                        video.play();
-                        document.getElementById('playPause').textContent = '⏸';
-                        showNotification('Playing', 1000);
-                    } else {
-                        video.pause();
-                        document.getElementById('playPause').textContent = '▶';
-                        showNotification('Paused', 1000);
-                    }
-                }
-            });
-            
-            document.getElementById('muteToggle').addEventListener('click', () => {
-                if (video) {
-                    video.muted = !video.muted;
-                    document.getElementById('muteToggle').textContent = video.muted ? '🔇' : '🔊';
-                    showNotification(video.muted ? 'Muted' : 'Unmuted', 1000);
-                }
-            });
-            
-            document.getElementById('fullscreen').addEventListener('click', () => {
-                if (!document.fullscreenElement) {
-                    document.documentElement.requestFullscreen();
-                    showNotification('Fullscreen Mode', 1500);
-                } else {
-                    document.exitFullscreen();
-                }
-            });
-            
-            document.getElementById('snapshot').addEventListener('click', takeSnapshot);
-            
-            document.getElementById('reset').addEventListener('click', () => {
-                camera.position.set(0, 0, 500);
-                camera.lookAt(scene.position);
-                hologramGroup.rotation.set(0, 0, 0);
-                showNotification('View Reset', 1500);
-            });
-            
-            // New interactive features
-            document.getElementById('gestureMode').addEventListener('click', () => {
-                config.gestureControl = !config.gestureControl;
-                document.getElementById('gestureMode').classList.toggle('active');
-                
-                if (config.gestureControl) {
-                    startGestureControl();
-                    document.getElementById('interactiveIndicator').style.display = 'block';
-                    document.getElementById('interactiveText').textContent = 'GESTURE CONTROL ACTIVE';
-                    showNotification('Gesture Control Enabled - Move your mouse to control', 2500);
-                } else {
-                    stopGestureControl();
-                    document.getElementById('interactiveIndicator').style.display = 'none';
-                    showNotification('Gesture Control Disabled', 1500);
-                }
-            });
-            
-            document.getElementById('autoPlay').addEventListener('click', () => {
-                config.autoEffects = !config.autoEffects;
-                document.getElementById('autoPlay').classList.toggle('active');
-                
-                if (config.autoEffects) {
-                    interactiveState.autoEffectTime = 0;
-                    showNotification('Auto Effects Enabled - Sit back and enjoy!', 2000);
-                } else {
-                    showNotification('Auto Effects Disabled', 1500);
-                }
-            });
-            
-            document.getElementById('recordMode').addEventListener('click', () => {
-                config.recording = !config.recording;
-                document.getElementById('recordMode').classList.toggle('active');
-                
-                if (config.recording) {
-                    startRecording();
-                    document.getElementById('recordMode').style.color = '#ff0000';
-                    showNotification('Recording Started', 1500);
-                } else {
-                    stopRecording();
-                    document.getElementById('recordMode').style.color = '';
-                    showNotification('Recording Stopped', 1500);
-                }
-            });
-            
-            // Keyboard shortcuts
-            document.addEventListener('keydown', (e) => {
-                switch(e.key) {
-                    case ' ':
-                        if (video) {
-                            if (video.paused) {
-                                video.play();
-                                document.getElementById('playPause').textContent = '⏸';
-                            } else {
-                                video.pause();
-                                document.getElementById('playPause').textContent = '▶';
-                            }
-                        }
-                        e.preventDefault();
-                        break;
-                    case 'h':
-                    case 'H':
-                        controlPanel.classList.toggle('visible');
-                        toggleBtn.classList.toggle('active');
-                        break;
-                    case 'r':
-                    case 'R':
-                        config.rotation = config.rotation > 0 ? 0 : 0.2;
-                        document.getElementById('rotation').value = config.rotation;
-                        document.getElementById('rotationValue').textContent = config.rotation;
-                        break;
-                    case 'f':
-                    case 'F':
-                        if (!document.fullscreenElement) {
-                            document.documentElement.requestFullscreen();
-                        } else {
-                            document.exitFullscreen();
-                        }
-                        break;
-                    case 's':
-                    case 'S':
-                        if (e.ctrlKey || e.metaKey) {
-                            e.preventDefault();
-                            takeSnapshot();
-                        }
-                        break;
-                    case '1':
-                        document.getElementById('presetCyber').click();
-                        break;
-                    case '2':
-                        document.getElementById('presetMatrix').click();
-                        break;
-                    case '3':
-                        document.getElementById('presetClean').click();
-                        break;
-                    case '4':
-                        document.getElementById('presetQuantum').click();
-                        break;
-                    case '5':
-                        document.getElementById('presetCinema').click();
-                        break;
-                    case 'c':
-                    case 'C':
-                        // Quick toggle between cinema and hologram mode
-                        if (config.hologramIntensity > 0.5) {
-                            document.getElementById('presetCinema').click();
-                        } else {
-                            config.hologramIntensity = 0.8;
-                            document.getElementById('hologramIntensity').value = 80;
-                            document.getElementById('hologramIntensityValue').textContent = '80%';
-                            showNotification('Hologram Mode', 1500);
-                        }
-                        break;
-                    case 'g':
-                    case 'G':
-                        document.getElementById('gestureMode').click();
-                        break;
-                    case 'a':
-                    case 'A':
-                        document.getElementById('autoPlay').click();
-                        break;
-                    case 'ArrowUp':
-                        config.brightness = Math.min(2, config.brightness + 0.1);
-                        document.getElementById('brightness').value = config.brightness;
-                        document.getElementById('brightnessValue').textContent = config.brightness.toFixed(1);
-                        e.preventDefault();
-                        break;
-                    case 'ArrowDown':
-                        config.brightness = Math.max(0.5, config.brightness - 0.1);
-                        document.getElementById('brightness').value = config.brightness;
-                        document.getElementById('brightnessValue').textContent = config.brightness.toFixed(1);
-                        e.preventDefault();
-                        break;
-                    case 'ArrowLeft':
-                        if (video) {
-                            video.currentTime = Math.max(0, video.currentTime - 5);
-                        }
-                        e.preventDefault();
-                        break;
-                    case 'ArrowRight':
-                        if (video) {
-                            video.currentTime = Math.min(video.duration, video.currentTime + 5);
-                        }
-                        e.preventDefault();
-                        break;
-                }
-            });
-            
-            // Double-click to toggle panel
-            document.addEventListener('dblclick', () => {
-                controlPanel.classList.toggle('visible');
-                toggleBtn.classList.toggle('active');
-            });
-        }
-        
-        // Initialize on load
-        window.addEventListener('DOMContentLoaded', () => {
-            console.log('Initializing Enhanced Holographic System v2.0...');
-            
-            try {
-                init();
-                
-                setTimeout(() => {
-                    document.getElementById('loading').innerHTML = 
-                        '<div>SYSTEM READY</div>' +
-                        '<div style="font-size: 14px; margin-top: 10px;">Load a video or use demo</div>' +
-                        '<div style="font-size: 12px; margin-top: 10px; color: #ff00ff;">Press H to toggle controls</div>' +
-                        '<div style="font-size: 12px; margin-top: 5px; color: #ffaa00;">Press C for Cinema Mode (Clear Video)</div>' +
-                        '<div style="font-size: 11px; margin-top: 5px; color: #00ffff;">G: Gesture | A: Auto Effects | 1-5: Presets</div>';
-                }, 1500);
-                
-            } catch (error) {
-                console.error('Initialization error:', error);
-                document.getElementById('loading').innerHTML = 
-                    '<div>ERROR</div>' +
-                    '<div style="font-size: 14px; margin-top: 10px; color: #ff0000;">' + error.message + '</div>';
             }
         });
     </script>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a0033 100%);
+            font-family: 'Arial', sans-serif;
+            -webkit-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+
+        #canvas-ar {
+            display: none;
+        }
+
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            animation: fadeOut 2s forwards;
+            animation-delay: 1s;
+        }
+
+        .loading-text {
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-shadow: 0 0 20px rgba(255,255,255,0.5);
+        }
+
+        .pulse-ring {
+            width: 100px;
+            height: 100px;
+            border: 3px solid rgba(255,255,255,0.5);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(0.8);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.2);
+                opacity: 0.5;
+            }
+            100% {
+                transform: scale(0.8);
+                opacity: 1;
+            }
+        }
+
+        @keyframes fadeOut {
+            to {
+                opacity: 0;
+                visibility: hidden;
+            }
+        }
+
+        .info-panel {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+            z-index: 100;
+            max-width: 300px;
+        }
+
+        .info-panel h3 {
+            margin: 0 0 10px 0;
+            color: #00ffff;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+        }
+
+        .info-panel p {
+            margin: 5px 0;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .glow-button {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            transition: all 0.3s ease;
+            z-index: 100;
+        }
+
+        .glow-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Loading Screen -->
+    <div class="loading-screen">
+        <div class="loading-text">Initializing AR Experience</div>
+        <div class="pulse-ring"></div>
+    </div>
+
+    <!-- Info Panel -->
+    <div class="info-panel">
+        <h3>🎯 AR Circle Tracker</h3>
+        <p>📱 Point your camera at a circular target image</p>
+        <p>✨ Watch the magic happen when detected</p>
+        <p>🎨 Interactive particle system with flow fields</p>
+    </div>
+
+    <!-- Reset Button -->
+    <button class="glow-button" onclick="location.reload()">Reset Experience</button>
+
+    <!-- P5.js Canvas -->
+    <canvas id="canvas-ar"></canvas>
+
+    <!-- A-Frame AR Scene -->
+    <a-scene 
+        mindar-image="imageTargetSrc: targets.mind; filterMinCF:0.0001; filterBeta: 0.01; warmupTolerance: 5; missTolerance: 5;" 
+        vr-mode-ui="enabled: false" 
+        device-orientation-permission-ui="enabled: false"
+        color-space="sRGB"
+        renderer="colorManagement: true; physicallyCorrectLights: true;">
+        
+        <!-- Camera -->
+        <a-camera 
+            position="0 0 0" 
+            look-controls="enabled: false"
+            cursor="fuse: false; rayOrigin: mouse;">
+        </a-camera>
+
+        <!-- AR Target 1 - Main circular target -->
+        <a-entity 
+            id="target-1" 
+            mindar-image-target="targetIndex: 0"
+            target-events>
+            
+            <!-- P5.js Canvas Plane -->
+            <a-plane 
+                width="1" 
+                height="1.4145" 
+                position="0 0 0" 
+                scale="1.1 1.1 1.1" 
+                rotation="0 0 0" 
+                material="src:#canvas-ar; transparent: true; opacity: 0.95; side: double;" 
+                canvas-updater
+                animation="property: rotation; to: 0 360 0; dur: 30000; loop: true; easing: linear;">
+            </a-plane>
+
+            <!-- Additional decorative elements -->
+            <a-ring 
+                color="#00ffff" 
+                radius-inner="0.8" 
+                radius-outer="0.85"
+                position="0 0 -0.01"
+                animation="property: rotation; to: 0 0 360; dur: 10000; loop: true; easing: linear;"
+                material="opacity: 0.5; side: double;">
+            </a-ring>
+
+            <a-ring 
+                color="#ff00ff" 
+                radius-inner="0.9" 
+                radius-outer="0.95"
+                position="0 0 -0.02"
+                animation="property: rotation; to: 0 0 -360; dur: 15000; loop: true; easing: linear;"
+                material="opacity: 0.3; side: double;">
+            </a-ring>
+        </a-entity>
+
+        <!-- You can add more targets here -->
+        <!-- <a-entity id="target-2" mindar-image-target="targetIndex: 1" target-events>
+            ... custom content for second target ...
+        </a-entity> -->
+
+    </a-scene>
 </body>
 </html>
