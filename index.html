@@ -2,38 +2,51 @@
 <html lang="zh-TW">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Modern P5.js AR Experience</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>互動式 p5.js AR 特效</title>
     
-    <!-- 載入 A-Frame + MindAR + p5.js -->
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.3/dist/mindar-image-aframe.prod.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
     
-    <!-- P5.js 主要程式 -->
     <script>
+        // ===== 全域變數 =====
         let particles = [];
         let targetFound = false;
         let targetLost = false;
         let animationPhase = 0;
         let time = 0;
-        let canvas;
-        
-        // 粒子系統類別
+        let p5Canvas;
+
+        // 互動追蹤變數
+        let touches = [];
+        let gestureTracker = {
+            path: [],
+            startTime: 0,
+            isDrawing: false,
+            lastGestureType: 'none'
+        };
+
+        // 手勢檢測設定
+        const CIRCLE_THRESHOLD = 0.7; // 圓形檢測閾值 (起點和終點很近)
+        const LINE_THRESHOLD = 0.8;   // 直線檢測閾值 (路徑長度和位移長度很接近)
+        const MIN_PATH_LENGTH = 30;   // 認定為手勢的最小路徑長度
+
+        // ===== 粒子系統類別 =====
         class Particle {
-            constructor(x, y, type = 'firework') {
+            constructor(x, y, type = 'firework', options = {}) {
                 this.pos = createVector(x, y);
                 this.vel = createVector();
                 this.acc = createVector();
-                this.life = 255;
-                this.maxLife = 255;
-                this.size = random(2, 6);
+                this.life = options.life || 255;
+                this.maxLife = this.life;
+                this.size = options.size || random(2, 6);
                 this.type = type;
-                this.hue = random(360);
+                this.hue = options.hue || random(360);
                 this.trail = [];
-                this.maxTrail = 10;
-                
-                // 根據類型設定不同的初始速度
+                this.maxTrail = options.trail || 10;
+                this.interactive = options.interactive || false;
+
                 switch(type) {
                     case 'firework':
                         this.vel = p5.Vector.random2D().mult(random(2, 8));
@@ -49,302 +62,438 @@
                         this.vel = p5.Vector.random2D().mult(random(0.5, 2));
                         this.twinkle = random(TWO_PI);
                         break;
+                    case 'ripple':
+                        this.radius = 0;
+                        this.maxRadius = options.maxRadius || 50;
+                        this.vel = createVector(0, 0);
+                        this.life = 150;
+                        break;
+                    case 'sparkle':
+                        this.vel = p5.Vector.random2D().mult(random(1, 4));
+                        this.sparklePhase = random(TWO_PI);
+                        this.life = 100;
+                        break;
+                    case 'trail':
+                        this.vel = createVector(0, 0);
+                        this.target = createVector(x, y);
+                        this.life = 80;
+                        break;
                 }
             }
-            
+
             update() {
-                // 更新軌跡
-                this.trail.push(this.pos.copy());
-                if (this.trail.length > this.maxTrail) {
-                    this.trail.shift();
+                if (this.type !== 'ripple') {
+                    this.trail.push(this.pos.copy());
+                    if (this.trail.length > this.maxTrail) {
+                        this.trail.shift();
+                    }
                 }
-                
-                // 根據類型更新物理
+
                 switch(this.type) {
                     case 'firework':
                         this.acc.add(this.gravity);
                         break;
                     case 'flower':
                         this.rotation += this.rotSpeed;
-                        // 花瓣式運動
                         let force = p5.Vector.fromAngle(this.rotation * 3).mult(0.02);
                         this.acc.add(force);
                         break;
                     case 'star':
                         this.twinkle += 0.1;
-                        // 星星閃爍效果
                         this.size = 3 + sin(this.twinkle) * 2;
                         break;
+                    case 'ripple':
+                        this.radius += 2;
+                        if (this.radius > this.maxRadius) {
+                            this.life -= 8;
+                        }
+                        break;
+                    case 'sparkle':
+                        this.sparklePhase += 0.2;
+                        this.size = 2 + sin(this.sparklePhase) * 1.5;
+                        break;
+                    case 'trail':
+                        if (this.target) {
+                            let force = p5.Vector.sub(this.target, this.pos);
+                            force.mult(0.1);
+                            this.vel.add(force);
+                            this.vel.mult(0.9);
+                        }
+                        break;
                 }
-                
+
                 this.vel.add(this.acc);
                 this.pos.add(this.vel);
                 this.acc.mult(0);
-                this.life -= 2;
+                this.life -= (this.interactive ? 1.5 : 2);
             }
-            
+
             display() {
                 push();
                 colorMode(HSB, 360, 100, 100, 100);
-                
-                // 繪製軌跡
-                noFill();
-                for (let i = 0; i < this.trail.length - 1; i++) {
-                    let alpha = map(i, 0, this.trail.length - 1, 0, this.life / 2.55);
-                    stroke(this.hue, 80, 90, alpha);
-                    strokeWeight(map(i, 0, this.trail.length - 1, 1, 3));
-                    line(this.trail[i].x, this.trail[i].y, this.trail[i + 1].x, this.trail[i + 1].y);
+
+                if (this.type !== 'ripple') {
+                    noFill();
+                    for (let i = 0; i < this.trail.length - 1; i++) {
+                        let alpha = map(i, 0, this.trail.length - 1, 0, this.life / 2.55);
+                        stroke(this.hue, 80, 90, alpha);
+                        strokeWeight(map(i, 0, this.trail.length - 1, 1, 3));
+                        line(this.trail[i].x, this.trail[i].y, this.trail[i + 1].x, this.trail[i + 1].y);
+                    }
                 }
-                
-                // 繪製主體
+
                 translate(this.pos.x, this.pos.y);
-                
+
                 switch(this.type) {
                     case 'firework':
-                        // 煙火效果
                         fill(this.hue, 100, 100, this.life / 2.55);
                         noStroke();
                         circle(0, 0, this.size);
-                        
-                        // 外圈光暈
                         fill(this.hue, 60, 100, this.life / 5.1);
                         circle(0, 0, this.size * 2);
                         break;
-                        
                     case 'flower':
-                        // 花瓣效果
                         rotate(this.rotation);
                         fill(this.hue, 70, 90, this.life / 2.55);
                         noStroke();
-                        
-                        // 繪製花瓣
                         for (let i = 0; i < 6; i++) {
                             rotate(PI / 3);
                             ellipse(0, -this.size, this.size * 0.8, this.size * 2);
                         }
                         break;
-                        
                     case 'star':
-                        // 星星效果
                         rotate(this.rotation);
                         fill(this.hue, 80, 100, this.life / 2.55);
                         noStroke();
-                        
-                        // 繪製星形
                         beginShape();
                         for (let i = 0; i < 10; i++) {
                             let angle = map(i, 0, 10, 0, TWO_PI);
                             let r = (i % 2 === 0) ? this.size : this.size * 0.5;
-                            let x = cos(angle) * r;
-                            let y = sin(angle) * r;
-                            vertex(x, y);
+                            vertex(cos(angle) * r, sin(angle) * r);
                         }
                         endShape(CLOSE);
                         break;
+                    case 'ripple':
+                        noFill();
+                        strokeWeight(3);
+                        stroke(this.hue, 80, 100, this.life / 2.55);
+                        circle(0, 0, this.radius * 2);
+                        strokeWeight(1);
+                        stroke(this.hue, 60, 80, this.life / 4);
+                        circle(0, 0, this.radius * 1.5);
+                        break;
+                    case 'sparkle':
+                        fill(this.hue, 90, 100, this.life / 1.5);
+                        noStroke();
+                        rectMode(CENTER);
+                        rect(0, 0, this.size * 3, this.size * 0.5);
+                        rect(0, 0, this.size * 0.5, this.size * 3);
+                        fill(0, 0, 100, this.life / 1.2);
+                        circle(0, 0, this.size);
+                        break;
+                    case 'trail':
+                        fill(this.hue, 70, 90, this.life / 2);
+                        noStroke();
+                        circle(0, 0, this.size);
+                        fill(this.hue, 50, 70, this.life / 4);
+                        circle(-this.vel.x * 2, -this.vel.y * 2, this.size * 0.5);
+                        break;
                 }
-                
                 pop();
             }
-            
+
             isDead() {
                 return this.life <= 0;
             }
         }
-        
+
+        // ===== P5.js 主要函式 =====
         function setup() {
-            // 創建canvas並設定為全域變數
-            canvas = createCanvas(512, 512);
-            
-            // 等待DOM載入完成後再掛載canvas
-            if (document.getElementById('canvas-container')) {
-                canvas.parent('canvas-container');
-            } else {
-                // 如果容器還沒準備好，創建一個
-                let container = document.createElement('div');
-                container.id = 'canvas-container';
-                container.style.display = 'none';
-                document.body.appendChild(container);
-                canvas.parent('canvas-container');
-            }
-            
+            p5Canvas = createCanvas(512, 724); // 使用 A-Frame 平面比例 (1:1.4145)
+            p5Canvas.parent('canvas-container');
             colorMode(HSB, 360, 100, 100, 100);
             
-            // 監聽目標檢測事件
             document.addEventListener('targetFound', handleTargetFound);
             document.addEventListener('targetLost', handleTargetLost);
-            
             console.log('P5.js setup complete');
         }
-        
+
         function draw() {
-            time += 0.016; // 假設 60fps
-            
-            // 清除畫布 - 使用透明背景
-            clear();
-            
+            time += 0.016;
+            clear(); // 使用透明背景
+
             if (targetFound) {
-                // 創建新粒子
-                if (frameCount % 3 === 0) { // 每3幀創建新粒子
+                if (frameCount % 8 === 0 && !gestureTracker.isDrawing) {
                     createParticlesBasedOnTarget();
                 }
-                
-                // 背景效果
                 drawBackground();
+                handleTouchInteraction();
             }
-            
-            // 更新和繪製粒子
+
             for (let i = particles.length - 1; i >= 0; i--) {
                 particles[i].update();
                 particles[i].display();
-                
                 if (particles[i].isDead()) {
                     particles.splice(i, 1);
                 }
             }
-            
-            // 漸入動畫
-            if (targetFound && animationPhase < 1) {
-                animationPhase += 0.02;
+
+            if (gestureTracker.isDrawing && gestureTracker.path.length > 1) {
+                drawGesturePath();
             }
             
-            // 漸出動畫
+            if (targetFound && animationPhase < 1) {
+                animationPhase = min(1, animationPhase + 0.02);
+            }
             if (targetLost) {
-                animationPhase -= 0.05;
+                animationPhase = max(0, animationPhase - 0.05);
                 if (animationPhase <= 0) {
                     targetLost = false;
                     particles = [];
                 }
             }
         }
-        
-        function createParticlesBasedOnTarget() {
-            // 根據目標類型創建不同效果
-            let centerX = width / 2;
-            let centerY = height / 2;
-            
-            // 這裡可以根據實際的目標圖片類型來調整
-            let targetType = Math.floor(time / 10) % 3; // 循環切換效果類型
-            
-            switch(targetType) {
-                case 0: // 煙火效果
-                    for (let i = 0; i < 3; i++) {
-                        let x = centerX + random(-50, 50);
-                        let y = centerY + random(-50, 50);
-                        particles.push(new Particle(x, y, 'firework'));
-                    }
-                    break;
-                    
-                case 1: // 花朵效果
-                    let flowerCount = 2;
-                    for (let i = 0; i < flowerCount; i++) {
-                        let angle = (TWO_PI / flowerCount) * i + time * 0.5;
-                        let x = centerX + cos(angle) * 30;
-                        let y = centerY + sin(angle) * 30;
-                        particles.push(new Particle(x, y, 'flower'));
-                    }
-                    break;
-                    
-                case 2: // 星際效果
-                    for (let i = 0; i < 2; i++) {
-                        let x = centerX + random(-80, 80);
-                        let y = centerY + random(-80, 80);
-                        particles.push(new Particle(x, y, 'star'));
-                    }
-                    break;
-            }
-        }
-        
-        function drawBackground() {
-            // 動態背景效果
-            push();
-            colorMode(HSB, 360, 100, 100, 100);
-            
-            // 漸變背景
-            for (let y = 0; y < height; y += 4) {
-                let alpha = map(sin(y * 0.01 + time), -1, 1, 2, 8);
-                let hue = (time * 20 + y * 0.1) % 360;
-                stroke(hue, 40, 20, alpha);
-                strokeWeight(1);
-                line(0, y, width, y);
-            }
-            
-            // 添加一些背景粒子
-            fill(0, 0, 100, 8);
-            noStroke();
-            for (let i = 0; i < 15; i++) {
-                let x = (noise(i * 0.1, time * 0.05) * width);
-                let y = (noise(i * 0.1 + 100, time * 0.05) * height);
-                let size = noise(i * 0.1 + 200, time * 0.05) * 2 + 1;
-                circle(x, y, size);
-            }
-            
-            pop();
-        }
-        
+
+        // ===== AR 事件處理 =====
         function handleTargetFound() {
             console.log('Target found!');
             targetFound = true;
             targetLost = false;
             animationPhase = 0;
         }
-        
+
         function handleTargetLost() {
             console.log('Target lost!');
             targetFound = false;
             targetLost = true;
+            // 清除互動狀態
+            gestureTracker.isDrawing = false;
+            gestureTracker.path = [];
+            touches = [];
         }
+
+        // ===== 互動功能 =====
+        function handleTouchInteraction() {
+            // 這個函式處理持續觸摸的效果
+            if (touches.length > 0) {
+                 // 在觸摸點創建即時效果
+                 if (frameCount % 2 === 0) {
+                    createTouchEffects(touches[0].x, touches[0].y);
+                }
+            }
+        }
+        
+        function createTouchEffects(x, y) {
+            particles.push(new Particle(x, y, 'ripple', {
+                hue: (frameCount * 2) % 360,
+                maxRadius: 40,
+                interactive: true
+            }));
+            
+            if (random() > 0.7) {
+                particles.push(new Particle(x + random(-10, 10), y + random(-10, 10), 'sparkle', {
+                    hue: (frameCount * 3 + 60) % 360,
+                    size: random(1, 3),
+                    interactive: true
+                }));
+            }
+        }
+
+        // ===== 手勢處理 =====
+        function processGesture() {
+            if (gestureTracker.path.length < MIN_PATH_LENGTH) return;
+            
+            let gestureType = detectGestureType();
+            let centerPoint = getPathCenter();
+            
+            console.log('Detected gesture:', gestureType);
+            
+            switch(gestureType) {
+                case 'circle':
+                    createCircleEffect(centerPoint.x, centerPoint.y);
+                    break;
+                case 'line':
+                    createLineEffect();
+                    break;
+                case 'complex':
+                    createComplexEffect(centerPoint.x, centerPoint.y);
+                    break;
+            }
+            
+            gestureTracker.lastGestureType = gestureType;
+        }
+
+        function detectGestureType() {
+            if (gestureTracker.path.length < MIN_PATH_LENGTH) return 'none';
+            
+            let pathLength = getTotalPathLength();
+            let startPoint = gestureTracker.path[0];
+            let endPoint = gestureTracker.path[gestureTracker.path.length - 1];
+            let displacement = dist(startPoint.x, startPoint.y, endPoint.x, endPoint.y);
+            
+            let closedness = 1 - (displacement / pathLength);
+            let straightness = displacement / pathLength;
+            
+            if (closedness > CIRCLE_THRESHOLD) {
+                return 'circle';
+            } else if (straightness > LINE_THRESHOLD) {
+                return 'line';
+            } else {
+                return 'complex';
+            }
+        }
+
+        // ===== 手勢特效創建 =====
+        function createCircleEffect(x, y) {
+            let hue = random(180, 280); // 藍紫色系
+            for (let i = 0; i < 12; i++) {
+                let angle = (TWO_PI / 12) * i;
+                particles.push(new Particle(x, y, 'flower', {
+                    hue: hue + random(-30, 30),
+                    size: random(3, 7),
+                    interactive: true,
+                    life: 180
+                }));
+            }
+        }
+
+        function createLineEffect() {
+            let hue = random(300, 360); // 紅色系
+            for (let i = 0; i < gestureTracker.path.length; i += 3) {
+                let point = gestureTracker.path[i];
+                particles.push(new Particle(point.x, point.y, 'firework', {
+                    hue: hue + random(-20, 20),
+                    size: random(2, 5),
+                    interactive: true
+                }));
+            }
+        }
+
+        function createComplexEffect(x, y) {
+            let hue = random(60, 180); // 綠黃色系
+            for (let i = 0; i < 8; i++) {
+                let px = x + random(-40, 40);
+                let py = y + random(-40, 40);
+                let type = random(['sparkle', 'trail', 'firework']);
+                particles.push(new Particle(px, py, type, {
+                    hue: hue + random(-40, 40),
+                    size: random(2, 6),
+                    interactive: true
+                }));
+            }
+        }
+
+        // ===== 輔助及繪圖函式 =====
+        function createParticlesBasedOnTarget() {
+             // ... (此處省略，與您提供的程式碼相同)
+        }
+        function drawBackground() {
+             // ... (此處省略，與您提供的程式碼相同)
+        }
+        function getPathCenter() {
+            let sumX = 0, sumY = 0;
+            for (let point of gestureTracker.path) {
+                sumX += point.x;
+                sumY += point.y;
+            }
+            return { x: sumX / gestureTracker.path.length, y: sumY / gestureTracker.path.length };
+        }
+        function getTotalPathLength() {
+            let length = 0;
+            for (let i = 1; i < gestureTracker.path.length; i++) {
+                length += dist(gestureTracker.path[i-1].x, gestureTracker.path[i-1].y, gestureTracker.path[i].x, gestureTracker.path[i].y);
+            }
+            return length;
+        }
+        function drawGesturePath() {
+            push();
+            stroke(255, 100);
+            strokeWeight(3);
+            noFill();
+            beginShape();
+            for (let point of gestureTracker.path) {
+                vertex(point.x, point.y);
+            }
+            endShape();
+            pop();
+        }
+
+        // ===== P5.js 內建事件處理 =====
+        function touchStarted() {
+            if (!targetFound) return;
+            
+            let touch = { x: mouseX, y: mouseY };
+            
+            // 開始手勢記錄
+            gestureTracker.isDrawing = true;
+            gestureTracker.startTime = millis();
+            gestureTracker.path = [touch];
+            
+            touches = [touch]; // 使用陣列來儲存當前觸摸點
+            
+            console.log('Touch started at:', touch.x, touch.y);
+            return false; // 防止頁面滾動等默認行為
+        }
+
+        function touchMoved() {
+            if (!targetFound || !gestureTracker.isDrawing) return;
+            
+            let touch = { x: mouseX, y: mouseY };
+            
+            gestureTracker.path.push(touch);
+            
+            if (touches.length > 0) {
+                touches[0] = touch; // 更新觸摸點
+            }
+            
+            return false;
+        }
+
+        function touchEnded() {
+            if (!targetFound || !gestureTracker.isDrawing) return;
+            
+            // 處理完成的手勢
+            processGesture();
+            
+            // 重設狀態
+            gestureTracker.isDrawing = false;
+            gestureTracker.path = [];
+            touches = []; // 清空觸摸點
+            
+            console.log('Touch ended.');
+            return false;
+        }
+
     </script>
 
-    <!-- A-Frame 畫布更新器組件 -->
     <script type="text/javascript">
         AFRAME.registerComponent('canvas-updater', {
             dependencies: ['geometry', 'material'],
-            
             init: function() {
-                console.log('Canvas updater initialized');
-                this.needsUpdate = true;
+                this.texture = null;
             },
-            
             tick: function () {
-                if (!this.needsUpdate) return;
-                
-                var mesh = this.el.getObject3D('mesh');
-                if (!mesh || !mesh.material) return;
-                
-                var material = mesh.material;
-                
-                // 確保P5.js canvas存在且可用
-                var canvasElement = document.querySelector('#canvas-container canvas');
-                if (!canvasElement) return;
-                
-                // 創建或更新紋理
-                if (!material.map || this.lastCanvas !== canvasElement) {
-                    if (typeof THREE !== 'undefined') {
-                        material.map = new THREE.CanvasTexture(canvasElement);
-                        material.map.minFilter = THREE.LinearFilter;
-                        material.map.magFilter = THREE.LinearFilter;
-                        material.needsUpdate = true;
-                        this.lastCanvas = canvasElement;
-                        console.log('Canvas texture created/updated');
-                    }
-                } else if (material.map) {
-                    material.map.needsUpdate = true;
+                var el = this.el;
+                var mesh = el.getObject3D('mesh');
+                if (!mesh || !p5Canvas) return;
+
+                if (!this.texture) {
+                    this.texture = new THREE.CanvasTexture(p5Canvas.elt);
+                    this.texture.minFilter = THREE.LinearFilter;
+                    this.texture.magFilter = THREE.LinearFilter;
+                    mesh.material.map = this.texture;
                 }
+                this.texture.needsUpdate = true;
             }
         });
         
         // 目標檢測事件處理
         AFRAME.registerComponent('target-handler', {
             init: function () {
-                console.log('Target handler initialized');
-                
-                this.el.addEventListener('targetFound', function () {
-                    console.log('MindAR target found event');
+                this.el.addEventListener('targetFound', () => {
                     document.dispatchEvent(new CustomEvent('targetFound'));
                 });
-                
-                this.el.addEventListener('targetLost', function () {
-                    console.log('MindAR target lost event');
+                this.el.addEventListener('targetLost', () => {
                     document.dispatchEvent(new CustomEvent('targetLost'));
                 });
             }
@@ -352,76 +501,23 @@
     </script>
 
     <style type="text/css">
-        body {
-            margin: 0;
-            padding: 0;
-            background: #000;
-            font-family: 'Arial', sans-serif;
-            -webkit-user-select: none;
-            -moz-user-select: none;
-            -ms-user-select: none;
-            user-select: none;
-            overflow: hidden;
-        }
-        
-        #canvas-container {
-            display: none;
-            position: absolute;
-            top: -9999px;
-            left: -9999px;
-        }
-        
-        /* 載入動畫 */
-        .loading {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: white;
-            font-size: 18px;
-            z-index: 1000;
-            background: rgba(0,0,0,0.8);
-            padding: 20px;
-            border-radius: 10px;
-        }
-        
-        /* 提示文字 */
-        .instruction {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: white;
-            background: rgba(0,0,0,0.7);
-            padding: 10px 20px;
-            border-radius: 25px;
-            font-size: 14px;
-            text-align: center;
-            z-index: 1000;
-        }
-        
-        a-scene {
-            height: 100vh;
-            width: 100vw;
-        }
+        body { margin: 0; padding: 0; background: #000; font-family: 'Arial', sans-serif; overflow: hidden; }
+        #canvas-container { display: none; } /* 隱藏原始畫布 */
+        .loading { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 18px; z-index: 1000; background: rgba(0,0,0,0.8); padding: 20px; border-radius: 10px; }
+        .instruction { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); color: white; background: rgba(0,0,0,0.7); padding: 10px 20px; border-radius: 25px; font-size: 14px; text-align: center; z-index: 1000; }
+        a-scene { height: 100vh; width: 100vw; }
     </style>
 </head>
 
 <body>
-    <!-- P5.js 畫布容器 -->
     <div id="canvas-container"></div>
     
-    <!-- 載入提示 -->
     <div class="loading" id="loadingText">正在初始化 AR...</div>
     
-    <!-- 使用提示 -->
-    <div class="instruction">
-        將相機對準目標圖片以觸發 AR 效果
-    </div>
+    <div class="instruction">將相機對準目標圖片以觸發 AR 效果</div>
     
-    <!-- MindAR + A-Frame AR 場景 -->
     <a-scene 
-        mindar-image="imageTargetSrc:https://raw.githubusercontent.com/isaoinvest/webAR-TEST/main/targets.mind; filterMinCF:0.0005; filterBeta: .1; warmupTolerance: 5; missTolerance: 5"
+        mindar-image="imageTargetSrc: https://raw.githubusercontent.com/isaoinvest/webAR-TEST/main/targets.mind; filterMinCF:0.0005; filterBeta: 0.1;"
         color-space="sRGB" 
         renderer="colorManagement: true, physicallyCorrectLights"
         vr-mode-ui="enabled: false" 
@@ -440,40 +536,20 @@
             mindar-image-target="targetIndex: 0"
             target-handler>
             
-            <!-- P5.js 畫布作為材質的平面，調整為標準海報比例 -->
             <a-plane 
                 width="1" 
                 height="1.4145" 
                 position="0 0 0" 
-                scale="1.1 1.1 1.1"
                 rotation="0 0 0" 
-                material="transparent: true; alphaTest: 0.1; side: double;"
+                material="transparent: true; opacity: 1;"
                 canvas-updater>
             </a-plane>
         </a-entity>
     </a-scene>
 
-    <!-- 初始化腳本 -->
     <script>
-        // 場景載入完成事件
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('DOM Content Loaded');
-        });
-        
-        // A-Frame場景載入完成
         document.querySelector('a-scene').addEventListener('loaded', function () {
-            console.log('A-Frame scene loaded');
             document.getElementById('loadingText').style.display = 'none';
-        });
-        
-        // 性能優化：限制幀率在移動設備上
-        if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-            console.log('Mobile device detected - optimizing performance');
-        }
-        
-        // 錯誤處理
-        window.addEventListener('error', function(e) {
-            console.error('JavaScript Error:', e.error);
         });
     </script>
 </body>
