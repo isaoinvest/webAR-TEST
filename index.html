@@ -208,7 +208,7 @@
     </div>
 
     <a-scene
-      mindar-image="imageTargetSrc: https://raw.githubusercontent.com/isaoinvest/webAR-TEST/main/targets.mind;
+      mindar-image="imageTargetSrc: https://raw.githubusercontent.com/isaoinvest/TEST1234/main/targets.mind;
                     warmupTolerance: 5;
                     missTolerance: 10;
                     filterMinCF: 0.000001; 
@@ -224,7 +224,7 @@
         <!-- 前景影片 (RGB) -->
         <video
           id="foreground-video"
-          src="https://raw.githubusercontent.com/isaoinvest/webAR-TEST/main/foreground.mp4"
+          src="foreground.mp4"
           preload="auto"
           loop
           crossorigin="anonymous"
@@ -236,7 +236,7 @@
         <!-- Alpha 影片 (灰階) -->
         <video
           id="alpha-video-asset"
-          src="https://raw.githubusercontent.com/isaoinvest/webAR-TEST/main/alpha.mp4"
+          src="alpha.mp4"
           preload="auto"
           loop
           crossorigin="anonymous"
@@ -264,12 +264,10 @@
       >
         <a-plane
           id="video0-entity"
-          src="#transparent-canvas"
           position="0 0 0"
           rotation="0 0 0"
-          transparent="true"
-          shader="standard"
-          material="transparent: true; alphaTest: 0.1"
+          geometry="primitive: plane"
+          material="shader: standard; transparent: true; alphaTest: 0.01; side: double"
         ></a-plane>
       </a-entity>
     </a-scene>
@@ -329,6 +327,9 @@
               }
 
               try {
+                // 清除canvas
+                this.outputCtx.clearRect(0, 0, width, height);
+                
                 // 繪製前景影片
                 this.outputCtx.drawImage(this.foregroundVideo, 0, 0, width, height);
                 
@@ -351,6 +352,12 @@
                 // 將處理後的資料繪製到輸出canvas
                 this.outputCtx.putImageData(foregroundImageData, 0, 0);
                 
+                // 通知A-Frame更新材質
+                const videoEntity = document.querySelector("#video0-entity");
+                if (videoEntity && videoEntity.components.material) {
+                  videoEntity.components.material.material.map.needsUpdate = true;
+                }
+                
               } catch (error) {
                 console.warn('影片處理錯誤:', error);
               }
@@ -360,7 +367,7 @@
           }
         }
 
-        // 自動調整影片比例
+        // 自動調整影片比例並設置材質
         AFRAME.registerComponent("fit-video-to-target", {
           init: function () {
             this.el.addEventListener("targetFound", () => {
@@ -373,6 +380,12 @@
                   width: 1,
                   height: 1 / ratio
                 });
+              }
+              
+              // 設置透明canvas作為材質
+              const canvas = document.querySelector("#transparent-canvas");
+              if (canvas) {
+                videoEntity.setAttribute("material", "src", canvas);
               }
             });
           }
@@ -410,6 +423,25 @@
 
         // 全螢幕處理器
         let fullscreenProcessor = null;
+
+        // 初始化canvas紋理
+        function initCanvasTexture() {
+          const videoEntity = document.querySelector("#video0-entity");
+          if (videoEntity && transparentCanvas) {
+            // 確保A-Frame材質能夠正確使用canvas
+            videoEntity.setAttribute("material", {
+              src: transparentCanvas,
+              transparent: true,
+              alphaTest: 0.01,
+              side: "double"
+            });
+          }
+        }
+
+        // 等待A-Frame場景完全載入後初始化
+        document.querySelector('a-scene').addEventListener('loaded', () => {
+          initCanvasTexture();
+        });
 
         // 狀態管理
         const state = {
@@ -569,6 +601,9 @@
           if (state.fullscreen) {
             toggleFullscreen();
           }
+          
+          // 確保材質已設置
+          initCanvasTexture();
           
           foregroundVideo.currentTime = 0;
           alphaVideo.currentTime = 0;
