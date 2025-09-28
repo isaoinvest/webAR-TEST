@@ -1,556 +1,607 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>互動式 p5.js AR 特效</title>
-    
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <link rel="preconnect" href="https://aframe.io" />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" />
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.3/dist/mindar-image-aframe.prod.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
-    
-    <script>
-        // ===== 全域變數 =====
-        let particles = [];
-        let targetFound = false;
-        let targetLost = false;
-        let animationPhase = 0;
-        let time = 0;
-        let p5Canvas;
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.2/dist/mindar-image-aframe.prod.js"></script>
 
-        // 互動追蹤變數
-        let touches = [];
-        let gestureTracker = {
-            path: [],
-            startTime: 0,
-            isDrawing: false,
-            lastGestureType: 'none'
-        };
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        width: 100vw;
+        height: 100vh;
+      }
 
-        // 手勢檢測設定
-        const CIRCLE_THRESHOLD = 0.7; // 圓形檢測閾值 (起點和終點很近)
-        const LINE_THRESHOLD = 0.8;   // 直線檢測閾值 (路徑長度和位移長度很接近)
-        const MIN_PATH_LENGTH = 30;   // 認定為手勢的最小路徑長度
+      /* 簡化掃描 UI */
+      #scanning-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+        background-color: rgba(0, 0, 0, 0.1);
+        transition: opacity 0.3s;
+      }
 
-        // ===== 粒子系統類別 =====
-        class Particle {
-            constructor(x, y, type = 'firework', options = {}) {
-                this.pos = createVector(x, y);
-                this.vel = createVector();
-                this.acc = createVector();
-                this.life = options.life || 255;
-                this.maxLife = this.life;
-                this.size = options.size || random(2, 6);
-                this.type = type;
-                this.hue = options.hue || random(360);
-                this.trail = [];
-                this.maxTrail = options.trail || 10;
-                this.interactive = options.interactive || false;
+      #scanning-overlay.hidden {
+        opacity: 0;
+      }
 
-                switch(type) {
-                    case 'firework':
-                        this.vel = p5.Vector.random2D().mult(random(2, 8));
-                        this.gravity = createVector(0, 0.05);
-                        break;
-                    case 'flower':
-                        let angle = random(TWO_PI);
-                        this.vel = createVector(cos(angle), sin(angle)).mult(random(1, 3));
-                        this.rotSpeed = random(-0.1, 0.1);
-                        this.rotation = 0;
-                        break;
-                    case 'star':
-                        this.vel = p5.Vector.random2D().mult(random(0.5, 2));
-                        this.twinkle = random(TWO_PI);
-                        break;
-                    case 'ripple':
-                        this.radius = 0;
-                        this.maxRadius = options.maxRadius || 50;
-                        this.vel = createVector(0, 0);
-                        this.life = 150;
-                        break;
-                    case 'sparkle':
-                        this.vel = p5.Vector.random2D().mult(random(1, 4));
-                        this.sparklePhase = random(TWO_PI);
-                        this.life = 100;
-                        break;
-                    case 'trail':
-                        this.vel = createVector(0, 0);
-                        this.target = createVector(x, y);
-                        this.life = 80;
-                        break;
-                }
-            }
+      .scanner-frame {
+        width: 180px;
+        height: 180px;
+        border: 2px solid rgba(255, 255, 255, 0.5);
+        border-radius: 10px;
+        position: relative;
+      }
 
-            update() {
-                if (this.type !== 'ripple') {
-                    this.trail.push(this.pos.copy());
-                    if (this.trail.length > this.maxTrail) {
-                        this.trail.shift();
-                    }
-                }
+      .scanner-line {
+        position: absolute;
+        height: 2px;
+        width: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent);
+        animation: scan 2s linear infinite;
+      }
 
-                switch(this.type) {
-                    case 'firework':
-                        this.acc.add(this.gravity);
-                        break;
-                    case 'flower':
-                        this.rotation += this.rotSpeed;
-                        let force = p5.Vector.fromAngle(this.rotation * 3).mult(0.02);
-                        this.acc.add(force);
-                        break;
-                    case 'star':
-                        this.twinkle += 0.1;
-                        this.size = 3 + sin(this.twinkle) * 2;
-                        break;
-                    case 'ripple':
-                        this.radius += 2;
-                        if (this.radius > this.maxRadius) {
-                            this.life -= 8;
-                        }
-                        break;
-                    case 'sparkle':
-                        this.sparklePhase += 0.2;
-                        this.size = 2 + sin(this.sparklePhase) * 1.5;
-                        break;
-                    case 'trail':
-                        if (this.target) {
-                            let force = p5.Vector.sub(this.target, this.pos);
-                            force.mult(0.1);
-                            this.vel.add(force);
-                            this.vel.mult(0.9);
-                        }
-                        break;
-                }
+      @keyframes scan {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(176px); }
+      }
 
-                this.vel.add(this.acc);
-                this.pos.add(this.vel);
-                this.acc.mult(0);
-                this.life -= (this.interactive ? 1.5 : 2);
-            }
+      /* 控制按鈕 - 簡化版 */
+      .controls-container {
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 1000;
+        display: flex;
+        gap: 15px;
+      }
 
-            display() {
-                push();
-                colorMode(HSB, 360, 100, 100, 100);
+      .icon-button {
+        width: 48px;
+        height: 48px;
+        background-color: rgba(0, 0, 0, 0.6);
+        border: 2px solid rgba(255, 255, 255, 0.5);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.3s;
+      }
+      
+      .icon-button:hover {
+        transform: scale(1.1);
+        background-color: rgba(0, 0, 0, 0.8);
+      }
+      
+      .icon-button.active {
+        background-color: rgba(0, 195, 255, 0.3);
+        border-color: rgba(0, 255, 255, 0.8);
+      }
 
-                if (this.type !== 'ripple') {
-                    noFill();
-                    for (let i = 0; i < this.trail.length - 1; i++) {
-                        let alpha = map(i, 0, this.trail.length - 1, 0, this.life / 2.55);
-                        stroke(this.hue, 80, 90, alpha);
-                        strokeWeight(map(i, 0, this.trail.length - 1, 1, 3));
-                        line(this.trail[i].x, this.trail[i].y, this.trail[i + 1].x, this.trail[i + 1].y);
-                    }
-                }
+      .icon-button svg {
+        width: 24px;
+        height: 24px;
+        fill: white;
+      }
 
-                translate(this.pos.x, this.pos.y);
+      /* 簡化的進度條 */
+      .progress-container {
+        position: fixed;
+        bottom: 80px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 200px;
+        height: 4px;
+        background: rgba(255, 255, 255, 0.3);
+        border-radius: 2px;
+        z-index: 1000;
+        overflow: hidden;
+      }
 
-                switch(this.type) {
-                    case 'firework':
-                        fill(this.hue, 100, 100, this.life / 2.55);
-                        noStroke();
-                        circle(0, 0, this.size);
-                        fill(this.hue, 60, 100, this.life / 5.1);
-                        circle(0, 0, this.size * 2);
-                        break;
-                    case 'flower':
-                        rotate(this.rotation);
-                        fill(this.hue, 70, 90, this.life / 2.55);
-                        noStroke();
-                        for (let i = 0; i < 6; i++) {
-                            rotate(PI / 3);
-                            ellipse(0, -this.size, this.size * 0.8, this.size * 2);
-                        }
-                        break;
-                    case 'star':
-                        rotate(this.rotation);
-                        fill(this.hue, 80, 100, this.life / 2.55);
-                        noStroke();
-                        beginShape();
-                        for (let i = 0; i < 10; i++) {
-                            let angle = map(i, 0, 10, 0, TWO_PI);
-                            let r = (i % 2 === 0) ? this.size : this.size * 0.5;
-                            vertex(cos(angle) * r, sin(angle) * r);
-                        }
-                        endShape(CLOSE);
-                        break;
-                    case 'ripple':
-                        noFill();
-                        strokeWeight(3);
-                        stroke(this.hue, 80, 100, this.life / 2.55);
-                        circle(0, 0, this.radius * 2);
-                        strokeWeight(1);
-                        stroke(this.hue, 60, 80, this.life / 4);
-                        circle(0, 0, this.radius * 1.5);
-                        break;
-                    case 'sparkle':
-                        fill(this.hue, 90, 100, this.life / 1.5);
-                        noStroke();
-                        rectMode(CENTER);
-                        rect(0, 0, this.size * 3, this.size * 0.5);
-                        rect(0, 0, this.size * 0.5, this.size * 3);
-                        fill(0, 0, 100, this.life / 1.2);
-                        circle(0, 0, this.size);
-                        break;
-                    case 'trail':
-                        fill(this.hue, 70, 90, this.life / 2);
-                        noStroke();
-                        circle(0, 0, this.size);
-                        fill(this.hue, 50, 70, this.life / 4);
-                        circle(-this.vel.x * 2, -this.vel.y * 2, this.size * 0.5);
-                        break;
-                }
-                pop();
-            }
+      .progress-bar {
+        height: 100%;
+        background: rgba(255, 255, 255, 0.8);
+        width: 0%;
+        transition: width 0.2s;
+      }
 
-            isDead() {
-                return this.life <= 0;
-            }
-        }
+      /* 全螢幕影片 */
+      #fullscreen-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        z-index: 999;
+        display: none;
+        background-color: rgba(0, 0, 0, 0.95);
+        cursor: pointer;
+      }
+      
+      #fullscreen-container.visible {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      
+      #fullscreen-canvas {
+        max-width: 100%;
+        max-height: 100%;
+      }
 
-        // ===== P5.js 主要函式 =====
-        function setup() {
-            p5Canvas = createCanvas(512, 724); // 使用 A-Frame 平面比例 (1:1.4145)
-            p5Canvas.parent('canvas-container');
-            colorMode(HSB, 360, 100, 100, 100);
-            
-            document.addEventListener('targetFound', handleTargetFound);
-            document.addEventListener('targetLost', handleTargetLost);
-            console.log('P5.js setup complete');
-        }
-
-        function draw() {
-            time += 0.016;
-            clear(); // 使用透明背景
-
-            if (targetFound) {
-                if (frameCount % 8 === 0 && !gestureTracker.isDrawing) {
-                    createParticlesBasedOnTarget();
-                }
-                drawBackground();
-                handleTouchInteraction();
-            }
-
-            for (let i = particles.length - 1; i >= 0; i--) {
-                particles[i].update();
-                particles[i].display();
-                if (particles[i].isDead()) {
-                    particles.splice(i, 1);
-                }
-            }
-
-            if (gestureTracker.isDrawing && gestureTracker.path.length > 1) {
-                drawGesturePath();
-            }
-            
-            if (targetFound && animationPhase < 1) {
-                animationPhase = min(1, animationPhase + 0.02);
-            }
-            if (targetLost) {
-                animationPhase = max(0, animationPhase - 0.05);
-                if (animationPhase <= 0) {
-                    targetLost = false;
-                    particles = [];
-                }
-            }
-        }
-
-        // ===== AR 事件處理 =====
-        function handleTargetFound() {
-            console.log('Target found!');
-            targetFound = true;
-            targetLost = false;
-            animationPhase = 0;
-        }
-
-        function handleTargetLost() {
-            console.log('Target lost!');
-            targetFound = false;
-            targetLost = true;
-            // 清除互動狀態
-            gestureTracker.isDrawing = false;
-            gestureTracker.path = [];
-            touches = [];
-        }
-
-        // ===== 互動功能 =====
-        function handleTouchInteraction() {
-            // 這個函式處理持續觸摸的效果
-            if (touches.length > 0) {
-                 // 在觸摸點創建即時效果
-                 if (frameCount % 2 === 0) {
-                    createTouchEffects(touches[0].x, touches[0].y);
-                }
-            }
-        }
-        
-        function createTouchEffects(x, y) {
-            particles.push(new Particle(x, y, 'ripple', {
-                hue: (frameCount * 2) % 360,
-                maxRadius: 40,
-                interactive: true
-            }));
-            
-            if (random() > 0.7) {
-                particles.push(new Particle(x + random(-10, 10), y + random(-10, 10), 'sparkle', {
-                    hue: (frameCount * 3 + 60) % 360,
-                    size: random(1, 3),
-                    interactive: true
-                }));
-            }
-        }
-
-        // ===== 手勢處理 =====
-        function processGesture() {
-            if (gestureTracker.path.length < MIN_PATH_LENGTH) return;
-            
-            let gestureType = detectGestureType();
-            let centerPoint = getPathCenter();
-            
-            console.log('Detected gesture:', gestureType);
-            
-            switch(gestureType) {
-                case 'circle':
-                    createCircleEffect(centerPoint.x, centerPoint.y);
-                    break;
-                case 'line':
-                    createLineEffect();
-                    break;
-                case 'complex':
-                    createComplexEffect(centerPoint.x, centerPoint.y);
-                    break;
-            }
-            
-            gestureTracker.lastGestureType = gestureType;
-        }
-
-        function detectGestureType() {
-            if (gestureTracker.path.length < MIN_PATH_LENGTH) return 'none';
-            
-            let pathLength = getTotalPathLength();
-            let startPoint = gestureTracker.path[0];
-            let endPoint = gestureTracker.path[gestureTracker.path.length - 1];
-            let displacement = dist(startPoint.x, startPoint.y, endPoint.x, endPoint.y);
-            
-            let closedness = 1 - (displacement / pathLength);
-            let straightness = displacement / pathLength;
-            
-            if (closedness > CIRCLE_THRESHOLD) {
-                return 'circle';
-            } else if (straightness > LINE_THRESHOLD) {
-                return 'line';
-            } else {
-                return 'complex';
-            }
-        }
-
-        // ===== 手勢特效創建 =====
-        function createCircleEffect(x, y) {
-            let hue = random(180, 280); // 藍紫色系
-            for (let i = 0; i < 12; i++) {
-                let angle = (TWO_PI / 12) * i;
-                particles.push(new Particle(x, y, 'flower', {
-                    hue: hue + random(-30, 30),
-                    size: random(3, 7),
-                    interactive: true,
-                    life: 180
-                }));
-            }
-        }
-
-        function createLineEffect() {
-            let hue = random(300, 360); // 紅色系
-            for (let i = 0; i < gestureTracker.path.length; i += 3) {
-                let point = gestureTracker.path[i];
-                particles.push(new Particle(point.x, point.y, 'firework', {
-                    hue: hue + random(-20, 20),
-                    size: random(2, 5),
-                    interactive: true
-                }));
-            }
-        }
-
-        function createComplexEffect(x, y) {
-            let hue = random(60, 180); // 綠黃色系
-            for (let i = 0; i < 8; i++) {
-                let px = x + random(-40, 40);
-                let py = y + random(-40, 40);
-                let type = random(['sparkle', 'trail', 'firework']);
-                particles.push(new Particle(px, py, type, {
-                    hue: hue + random(-40, 40),
-                    size: random(2, 6),
-                    interactive: true
-                }));
-            }
-        }
-
-        // ===== 輔助及繪圖函式 =====
-        function createParticlesBasedOnTarget() {
-             // ... (此處省略，與您提供的程式碼相同)
-        }
-        function drawBackground() {
-             // ... (此處省略，與您提供的程式碼相同)
-        }
-        function getPathCenter() {
-            let sumX = 0, sumY = 0;
-            for (let point of gestureTracker.path) {
-                sumX += point.x;
-                sumY += point.y;
-            }
-            return { x: sumX / gestureTracker.path.length, y: sumY / gestureTracker.path.length };
-        }
-        function getTotalPathLength() {
-            let length = 0;
-            for (let i = 1; i < gestureTracker.path.length; i++) {
-                length += dist(gestureTracker.path[i-1].x, gestureTracker.path[i-1].y, gestureTracker.path[i].x, gestureTracker.path[i].y);
-            }
-            return length;
-        }
-        function drawGesturePath() {
-            push();
-            stroke(255, 100);
-            strokeWeight(3);
-            noFill();
-            beginShape();
-            for (let point of gestureTracker.path) {
-                vertex(point.x, point.y);
-            }
-            endShape();
-            pop();
-        }
-
-        // ===== P5.js 內建事件處理 =====
-        function touchStarted() {
-            if (!targetFound) return;
-            
-            let touch = { x: mouseX, y: mouseY };
-            
-            // 開始手勢記錄
-            gestureTracker.isDrawing = true;
-            gestureTracker.startTime = millis();
-            gestureTracker.path = [touch];
-            
-            touches = [touch]; // 使用陣列來儲存當前觸摸點
-            
-            console.log('Touch started at:', touch.x, touch.y);
-            return false; // 防止頁面滾動等默認行為
-        }
-
-        function touchMoved() {
-            if (!targetFound || !gestureTracker.isDrawing) return;
-            
-            let touch = { x: mouseX, y: mouseY };
-            
-            gestureTracker.path.push(touch);
-            
-            if (touches.length > 0) {
-                touches[0] = touch; // 更新觸摸點
-            }
-            
-            return false;
-        }
-
-        function touchEnded() {
-            if (!targetFound || !gestureTracker.isDrawing) return;
-            
-            // 處理完成的手勢
-            processGesture();
-            
-            // 重設狀態
-            gestureTracker.isDrawing = false;
-            gestureTracker.path = [];
-            touches = []; // 清空觸摸點
-            
-            console.log('Touch ended.');
-            return false;
-        }
-
-    </script>
-
-    <script type="text/javascript">
-        AFRAME.registerComponent('canvas-updater', {
-            dependencies: ['geometry', 'material'],
-            init: function() {
-                this.texture = null;
-            },
-            tick: function () {
-                var el = this.el;
-                var mesh = el.getObject3D('mesh');
-                if (!mesh || !p5Canvas) return;
-
-                if (!this.texture) {
-                    this.texture = new THREE.CanvasTexture(p5Canvas.elt);
-                    this.texture.minFilter = THREE.LinearFilter;
-                    this.texture.magFilter = THREE.LinearFilter;
-                    mesh.material.map = this.texture;
-                }
-                this.texture.needsUpdate = true;
-            }
-        });
-        
-        // 目標檢測事件處理
-        AFRAME.registerComponent('target-handler', {
-            init: function () {
-                this.el.addEventListener('targetFound', () => {
-                    document.dispatchEvent(new CustomEvent('targetFound'));
-                });
-                this.el.addEventListener('targetLost', () => {
-                    document.dispatchEvent(new CustomEvent('targetLost'));
-                });
-            }
-        });
-    </script>
-
-    <style type="text/css">
-        body { margin: 0; padding: 0; background: #000; font-family: 'Arial', sans-serif; overflow: hidden; }
-        #canvas-container { display: none; } /* 隱藏原始畫布 */
-        .loading { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 18px; z-index: 1000; background: rgba(0,0,0,0.8); padding: 20px; border-radius: 10px; }
-        .instruction { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); color: white; background: rgba(0,0,0,0.7); padding: 10px 20px; border-radius: 25px; font-size: 14px; text-align: center; z-index: 1000; }
-        a-scene { height: 100vh; width: 100vw; }
+      /* 隱藏的透明處理元素 */
+      .hidden-elements {
+        position: absolute;
+        top: -9999px;
+        left: -9999px;
+        opacity: 0;
+        pointer-events: none;
+      }
     </style>
-</head>
+  </head>
+  <body>
+    <!-- 控制按鈕 -->
+    <div class="controls-container">
+      <!-- 播放/暫停 -->
+      <button class="icon-button" id="play-button">
+        <svg viewBox="0 0 24 24" id="play-icon">
+          <path d="M8 5v14l11-7z"/>
+        </svg>
+        <svg viewBox="0 0 24 24" id="pause-icon" style="display:none;">
+          <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+        </svg>
+      </button>
+      
+      <!-- 聲音 -->
+      <button class="icon-button" id="sound-button">
+        <svg viewBox="0 0 24 24" id="sound-on-icon" style="display:none;">
+          <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+        </svg>
+        <svg viewBox="0 0 24 24" id="sound-off-icon">
+          <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+        </svg>
+      </button>
 
-<body>
-    <div id="canvas-container"></div>
+      <!-- 全螢幕 -->
+      <button class="icon-button" id="fullscreen-button">
+        <svg viewBox="0 0 24 24">
+          <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- 進度條 -->
+    <div class="progress-container">
+      <div class="progress-bar" id="progress-bar"></div>
+    </div>
+
+    <!-- 掃描動畫 -->
+    <div id="scanning-overlay">
+      <div class="scanner-frame">
+        <div class="scanner-line"></div>
+      </div>
+    </div>
     
-    <div class="loading" id="loadingText">正在初始化 AR...</div>
-    
-    <div class="instruction">將相機對準目標圖片以觸發 AR 效果</div>
-    
-    <a-scene 
-        mindar-image="imageTargetSrc: https://raw.githubusercontent.com/isaoinvest/webAR-TEST/main/targets.mind; filterMinCF:0.0005; filterBeta: 0.1;"
-        color-space="sRGB" 
-        renderer="colorManagement: true, physicallyCorrectLights"
-        vr-mode-ui="enabled: false" 
-        device-orientation-permission-ui="enabled: false"
-        loading-screen="enabled: false"
-        embedded>
+    <!-- 全螢幕容器 -->
+    <div id="fullscreen-container">
+      <canvas id="fullscreen-canvas"></canvas>
+    </div>
+
+    <!-- 隱藏的透明處理元素 -->
+    <div class="hidden-elements">
+      <video id="alpha-video" crossorigin="anonymous" playsinline webkit-playsinline muted></video>
+      <canvas id="processing-canvas"></canvas>
+    </div>
+
+    <a-scene
+      mindar-image="imageTargetSrc: https://raw.githubusercontent.com/isaoinvest/webAR-TEST/main/targets.mind;
+                    warmupTolerance: 5;
+                    missTolerance: 10;
+                    filterMinCF: 0.000001; 
+                    filterBeta: 250;
+                    uiScanning: #scanning-overlay;"
+      color-space="sRGB"
+      renderer="colorManagement: true, physicallyCorrectLights"
+      vr-mode-ui="enabled: false"
+      device-orientation-permission-ui="enabled: false"
+      loading-screen="enabled: true; dotsColor: #fff; backgroundColor: #000"
+    >
+      <a-assets>
+        <!-- 前景影片 (RGB) -->
+        <video
+          id="foreground-video"
+          src="https://raw.githubusercontent.com/isaoinvest/webAR-TEST/main/foreground.mp4"
+          preload="auto"
+          loop
+          crossorigin="anonymous"
+          playsinline
+          webkit-playsinline
+          muted
+        ></video>
         
-        <a-camera 
-            position="0 0 0" 
-            look-controls="enabled: false"
-            cursor="fuse: false; rayOrigin: mouse;">
-        </a-camera>
+        <!-- Alpha 影片 (灰階) -->
+        <video
+          id="alpha-video-asset"
+          src="https://raw.githubusercontent.com/isaoinvest/webAR-TEST/main/alpha.mp4"
+          preload="auto"
+          loop
+          crossorigin="anonymous"
+          playsinline
+          webkit-playsinline
+          muted
+        ></video>
         
-        <a-entity 
-            id="example-target" 
-            mindar-image-target="targetIndex: 0"
-            target-handler>
-            
-            <a-plane 
-                width="1" 
-                height="1.4145" 
-                position="0 0 0" 
-                rotation="0 0 0" 
-                material="transparent: true; opacity: 1;"
-                canvas-updater>
-            </a-plane>
-        </a-entity>
+        <!-- 動態生成的透明材質 -->
+        <canvas id="transparent-canvas" width="512" height="512"></canvas>
+      </a-assets>
+
+      <a-camera
+        position="0 0 0"
+        look-controls="enabled: false"
+        cursor="fuse: false; rayOrigin: mouse;"
+        raycaster="far: 10000; objects: .clickable"
+      ></a-camera>
+
+      <a-entity
+        id="target0"
+        mindar-image-target="targetIndex: 0"
+        data-target-aspect-ratio="1.414"
+        fit-video-to-target
+      >
+        <a-plane
+          id="video0-entity"
+          src="#transparent-canvas"
+          position="0 0 0"
+          rotation="0 0 0"
+          transparent="true"
+          shader="standard"
+          material="transparent: true; alphaTest: 0.1"
+        ></a-plane>
+      </a-entity>
     </a-scene>
 
     <script>
-        document.querySelector('a-scene').addEventListener('loaded', function () {
-            document.getElementById('loadingText').style.display = 'none';
+      // 等待 A-Frame 載入
+      if (window.AFRAME) {
+        initApp();
+      } else {
+        window.addEventListener('DOMContentLoaded', () => {
+          if (window.AFRAME) initApp();
+          else window.addEventListener('load', initApp);
         });
+      }
+
+      function initApp() {
+        // 透明影片處理類
+        class TransparentVideoProcessor {
+          constructor(foregroundVideo, alphaVideo, outputCanvas) {
+            this.foregroundVideo = foregroundVideo;
+            this.alphaVideo = alphaVideo;
+            this.outputCanvas = outputCanvas;
+            this.outputCtx = outputCanvas.getContext('2d');
+            this.processingCanvas = document.getElementById('processing-canvas');
+            this.processingCtx = this.processingCanvas.getContext('2d');
+            this.isProcessing = false;
+            this.animationId = null;
+          }
+
+          start() {
+            if (this.isProcessing) return;
+            this.isProcessing = true;
+            this.process();
+          }
+
+          stop() {
+            this.isProcessing = false;
+            if (this.animationId) {
+              cancelAnimationFrame(this.animationId);
+              this.animationId = null;
+            }
+          }
+
+          process() {
+            if (!this.isProcessing) return;
+
+            if (this.foregroundVideo.readyState >= 2 && this.alphaVideo.readyState >= 2) {
+              const width = this.foregroundVideo.videoWidth || 512;
+              const height = this.foregroundVideo.videoHeight || 512;
+
+              // 設定canvas尺寸
+              if (this.outputCanvas.width !== width || this.outputCanvas.height !== height) {
+                this.outputCanvas.width = width;
+                this.outputCanvas.height = height;
+                this.processingCanvas.width = width;
+                this.processingCanvas.height = height;
+              }
+
+              try {
+                // 繪製前景影片
+                this.outputCtx.drawImage(this.foregroundVideo, 0, 0, width, height);
+                
+                // 獲取前景像素資料
+                const foregroundImageData = this.outputCtx.getImageData(0, 0, width, height);
+                const foregroundData = foregroundImageData.data;
+
+                // 繪製alpha影片到處理canvas
+                this.processingCtx.drawImage(this.alphaVideo, 0, 0, width, height);
+                const alphaImageData = this.processingCtx.getImageData(0, 0, width, height);
+                const alphaData = alphaImageData.data;
+
+                // 合成透明效果
+                for (let i = 0; i < foregroundData.length; i += 4) {
+                  // 使用alpha影片的紅色通道作為透明度
+                  const alpha = alphaData[i] / 255;
+                  foregroundData[i + 3] = alpha * 255; // 設定透明度
+                }
+
+                // 將處理後的資料繪製到輸出canvas
+                this.outputCtx.putImageData(foregroundImageData, 0, 0);
+                
+              } catch (error) {
+                console.warn('影片處理錯誤:', error);
+              }
+            }
+
+            this.animationId = requestAnimationFrame(() => this.process());
+          }
+        }
+
+        // 自動調整影片比例
+        AFRAME.registerComponent("fit-video-to-target", {
+          init: function () {
+            this.el.addEventListener("targetFound", () => {
+              const videoEntity = this.el.querySelector("a-plane");
+              if (!videoEntity) return;
+              
+              const ratio = parseFloat(this.el.dataset.targetAspectRatio) || 1.0;
+              if (ratio > 0) {
+                videoEntity.setAttribute("geometry", {
+                  width: 1,
+                  height: 1 / ratio
+                });
+              }
+            });
+          }
+        });
+
+        // 主要元素
+        const foregroundVideo = document.querySelector("#foreground-video");
+        const alphaVideoAsset = document.querySelector("#alpha-video-asset");
+        const alphaVideo = document.querySelector("#alpha-video");
+        const transparentCanvas = document.querySelector("#transparent-canvas");
+        const targetEl = document.querySelector("#target0");
+        const scanningOverlay = document.getElementById("scanning-overlay");
+        const playButton = document.getElementById("play-button");
+        const soundButton = document.getElementById("sound-button");
+        const fullscreenButton = document.getElementById("fullscreen-button");
+        const fullscreenContainer = document.getElementById("fullscreen-container");
+        const fullscreenCanvas = document.getElementById("fullscreen-canvas");
+        const progressBar = document.getElementById("progress-bar");
+        
+        // 圖標元素
+        const playIcon = document.getElementById("play-icon");
+        const pauseIcon = document.getElementById("pause-icon");
+        const soundOnIcon = document.getElementById("sound-on-icon");
+        const soundOffIcon = document.getElementById("sound-off-icon");
+
+        // 複製alpha影片源到隱藏的影片元素
+        alphaVideo.src = alphaVideoAsset.src;
+
+        // 創建透明影片處理器
+        const transparentProcessor = new TransparentVideoProcessor(
+          foregroundVideo, 
+          alphaVideo, 
+          transparentCanvas
+        );
+
+        // 全螢幕處理器
+        let fullscreenProcessor = null;
+
+        // 狀態管理
+        const state = {
+          targetFound: false,
+          audioEnabled: false,
+          isPlaying: false,
+          fullscreen: false,
+          hasPlayed: false
+        };
+
+        // 更新按鈕圖標
+        function updateButtons() {
+          playIcon.style.display = state.isPlaying ? "none" : "block";
+          pauseIcon.style.display = state.isPlaying ? "block" : "none";
+          playButton.classList.toggle("active", state.isPlaying);
+          
+          soundOnIcon.style.display = state.audioEnabled ? "block" : "none";
+          soundOffIcon.style.display = state.audioEnabled ? "none" : "block";
+          soundButton.classList.toggle("active", state.audioEnabled);
+        }
+
+        // 音訊控制
+        function toggleAudio() {
+          state.audioEnabled = !state.audioEnabled;
+          foregroundVideo.muted = !state.audioEnabled;
+          alphaVideo.muted = true; // alpha影片始終靜音
+          updateButtons();
+        }
+
+        // 影片播放控制
+        async function playVideos() {
+          try {
+            const playPromises = [
+              foregroundVideo.play(),
+              alphaVideo.play()
+            ];
+            
+            await Promise.all(playPromises);
+            state.isPlaying = true;
+            transparentProcessor.start();
+            
+            if (fullscreenProcessor) {
+              fullscreenProcessor.start();
+            }
+            
+            updateButtons();
+          } catch (error) {
+            console.warn('播放失敗，嘗試靜音播放:', error);
+            foregroundVideo.muted = true;
+            alphaVideo.muted = true;
+            state.audioEnabled = false;
+            
+            try {
+              await Promise.all([foregroundVideo.play(), alphaVideo.play()]);
+              state.isPlaying = true;
+              transparentProcessor.start();
+              if (fullscreenProcessor) fullscreenProcessor.start();
+              updateButtons();
+            } catch (retryError) {
+              console.error('影片播放失敗:', retryError);
+            }
+          }
+        }
+
+        function pauseVideos() {
+          foregroundVideo.pause();
+          alphaVideo.pause();
+          state.isPlaying = false;
+          transparentProcessor.stop();
+          if (fullscreenProcessor) fullscreenProcessor.stop();
+          updateButtons();
+        }
+
+        // 播放/暫停切換
+        function togglePlayPause() {
+          if (!state.hasPlayed) return;
+          
+          if (state.isPlaying) {
+            pauseVideos();
+          } else {
+            playVideos();
+          }
+        }
+
+        // 全螢幕切換
+        function toggleFullscreen() {
+          if (!state.hasPlayed) return;
+          
+          if (state.fullscreen) {
+            // 退出全螢幕
+            fullscreenContainer.classList.remove("visible");
+            state.fullscreen = false;
+            if (fullscreenProcessor) {
+              fullscreenProcessor.stop();
+              fullscreenProcessor = null;
+            }
+            
+            if (state.targetFound && state.isPlaying) {
+              transparentProcessor.start();
+            } else if (!state.targetFound) {
+              scanningOverlay.classList.remove("hidden");
+            }
+          } else {
+            // 進入全螢幕
+            fullscreenContainer.classList.add("visible");
+            state.fullscreen = true;
+            transparentProcessor.stop();
+            
+            // 創建全螢幕處理器
+            fullscreenProcessor = new TransparentVideoProcessor(
+              foregroundVideo,
+              alphaVideo,
+              fullscreenCanvas
+            );
+            
+            if (state.isPlaying) {
+              fullscreenProcessor.start();
+            }
+          }
+        }
+
+        // 進度更新
+        function updateProgress() {
+          if (foregroundVideo && foregroundVideo.duration) {
+            const progress = (foregroundVideo.currentTime / foregroundVideo.duration) * 100;
+            progressBar.style.width = progress + "%";
+          }
+        }
+
+        // 按鈕事件
+        playButton.addEventListener("click", togglePlayPause);
+        soundButton.addEventListener("click", toggleAudio);
+        fullscreenButton.addEventListener("click", toggleFullscreen);
+        
+        // 全螢幕點擊退出
+        fullscreenContainer.addEventListener("click", (e) => {
+          if (e.target === fullscreenContainer || e.target === fullscreenCanvas) {
+            toggleFullscreen();
+          }
+        });
+
+        // 影片進度更新
+        foregroundVideo.addEventListener("timeupdate", updateProgress);
+
+        // 同步兩個影片的播放時間
+        foregroundVideo.addEventListener("timeupdate", () => {
+          if (Math.abs(foregroundVideo.currentTime - alphaVideo.currentTime) > 0.1) {
+            alphaVideo.currentTime = foregroundVideo.currentTime;
+          }
+        });
+
+        // 目標事件處理
+        targetEl.addEventListener("targetFound", () => {
+          state.targetFound = true;
+          state.hasPlayed = true;
+          
+          if (state.fullscreen) {
+            toggleFullscreen();
+          }
+          
+          foregroundVideo.currentTime = 0;
+          alphaVideo.currentTime = 0;
+          playVideos();
+          scanningOverlay.classList.add("hidden");
+        });
+
+        targetEl.addEventListener("targetLost", () => {
+          state.targetFound = false;
+          
+          pauseVideos();
+          
+          if (!state.fullscreen) {
+            setTimeout(() => {
+              if (!state.targetFound) {
+                scanningOverlay.classList.remove("hidden");
+              }
+            }, 200);
+          }
+        });
+
+        // 頁面可見性處理
+        document.addEventListener("visibilitychange", () => {
+          if (document.hidden) {
+            pauseVideos();
+          } else if (state.isPlaying) {
+            playVideos();
+          }
+        });
+
+        // 初始化
+        updateButtons();
+      }
     </script>
-</body>
+  </body>
 </html>
