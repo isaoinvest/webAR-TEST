@@ -12,7 +12,7 @@
     <style>
       body {
         margin: 0;
-        overflow: hidden;
+        [cite_start]overflow: hidden; [cite: 2]
         width: 100vw;
         height: 100vh;
       }
@@ -20,7 +20,7 @@
       /* 簡化掃描 UI */
       #scanning-overlay {
         position: fixed;
-        top: 0;
+        [cite_start]top: 0; [cite: 3]
         left: 0;
         width: 100%;
         height: 100%;
@@ -29,79 +29,79 @@
         align-items: center;
         justify-content: center;
         pointer-events: none;
-        background-color: rgba(0, 0, 0, 0.1);
+        [cite_start]background-color: rgba(0, 0, 0, 0.1); [cite: 4]
         transition: opacity 0.3s;
       }
 
       #scanning-overlay.hidden {
-        opacity: 0;
+        [cite_start]opacity: 0; [cite: 5]
       }
 
       .scanner-frame {
         width: 180px;
         height: 180px;
-        border: 2px solid rgba(255, 255, 255, 0.5);
+        [cite_start]border: 2px solid rgba(255, 255, 255, 0.5); [cite: 6]
         border-radius: 10px;
-        position: relative;
+        [cite_start]position: relative; [cite: 7]
       }
 
       .scanner-line {
         position: absolute;
         height: 2px;
-        width: 100%;
+        [cite_start]width: 100%; [cite: 8]
         background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent);
-        animation: scan 2s linear infinite;
+        [cite_start]animation: scan 2s linear infinite; [cite: 9]
       }
 
       @keyframes scan {
-        0%, 100% { transform: translateY(0); }
-        50% { transform: translateY(176px); }
+        [cite_start]0%, 100% { transform: translateY(0); [cite: 10] }
+        [cite_start]50% { transform: translateY(176px); [cite: 11] }
       }
 
       /* 控制按鈕 - 簡化版 */
       .controls-container {
         position: fixed;
-        bottom: 20px;
+        [cite_start]bottom: 20px; [cite: 12]
         left: 50%;
         transform: translateX(-50%);
         z-index: 1000;
         display: flex;
-        gap: 15px;
+        [cite_start]gap: 15px; [cite: 13]
       }
 
       .icon-button {
         width: 48px;
         height: 48px;
-        background-color: rgba(0, 0, 0, 0.6);
+        [cite_start]background-color: rgba(0, 0, 0, 0.6); [cite: 14]
         border: 2px solid rgba(255, 255, 255, 0.5);
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
-        cursor: pointer;
+        [cite_start]cursor: pointer; [cite: 15]
         transition: all 0.3s;
       }
       
       .icon-button:hover {
         transform: scale(1.1);
-        background-color: rgba(0, 0, 0, 0.8);
+        [cite_start]background-color: rgba(0, 0, 0, 0.8); [cite: 16]
       }
       
       .icon-button.active {
         background-color: rgba(0, 195, 255, 0.3);
-        border-color: rgba(0, 255, 255, 0.8);
+        [cite_start]border-color: rgba(0, 255, 255, 0.8); [cite: 17]
       }
 
       .icon-button svg {
-        width: 24px;
-        height: 24px;
+        [cite_start]width: 24px; [cite: 18]
+        [cite_start]height: 24px; [cite: 18]
         fill: white;
       }
 
       /* 簡化的進度條 */
       .progress-container {
         position: fixed;
-        bottom: 80px;
+        [cite_start]bottom: 80px; [cite: 19]
         left: 50%;
         transform: translateX(-50%);
         width: 200px;
@@ -109,45 +109,44 @@
         background: rgba(255, 255, 255, 0.3);
         border-radius: 2px;
         z-index: 1000;
-        overflow: hidden;
+        [cite_start]overflow: hidden; [cite: 20]
       }
 
       .progress-bar {
         height: 100%;
-        background: rgba(255, 255, 255, 0.8);
+        [cite_start]background: rgba(255, 255, 255, 0.8); [cite: 21]
         width: 0%;
-        transition: width 0.2s;
+        [cite_start]transition: width 0.2s; [cite: 22]
       }
 
       /* 全螢幕影片 */
       #fullscreen-container {
         position: fixed;
-        top: 0;
+        [cite_start]top: 0; [cite: 23]
         left: 0;
         width: 100vw;
         height: 100vh;
         z-index: 999;
         display: none;
         background-color: rgba(0, 0, 0, 0.95);
-        cursor: pointer;
+        [cite_start]cursor: pointer; [cite: 24]
       }
       
       #fullscreen-container.visible {
-        display: flex;
-        align-items: center;
+        [cite_start]display: flex; [cite: 25]
+        [cite_start]align-items: center; [cite: 25]
         justify-content: center;
       }
       
       #fullscreen-canvas {
-        max-width: 100%;
-        max-height: 100%;
-        image-rendering: -webkit-optimize-contrast;
+        [cite_start]max-width: 100%; [cite: 26]
+        [cite_start]max-height: 100%; [cite: 26]
       }
 
       /* 隱藏的透明處理元素 */
       .hidden-elements {
         position: absolute;
-        top: -9999px;
+        [cite_start]top: -9999px; [cite: 27]
         left: -9999px;
         opacity: 0;
         pointer-events: none;
@@ -163,14 +162,16 @@
         <svg viewBox="0 0 24 24" id="pause-icon" style="display:none;">
           <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
         </svg>
-      </button>
+    
+      [cite_start]</button> [cite: 28]
       
       <button class="icon-button" id="sound-button">
         <svg viewBox="0 0 24 24" id="sound-on-icon" style="display:none;">
           <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
         </svg>
         <svg viewBox="0 0 24 24" id="sound-off-icon">
-          <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+          <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 
+ [cite_start]12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/> [cite: 29]
         </svg>
       </button>
 
@@ -182,7 +183,7 @@
     </div>
 
     <div class="progress-container">
-      <div class="progress-bar" id="progress-bar"></div>
+      [cite_start]<div class="progress-bar" id="progress-bar"></div> [cite: 30]
     </div>
 
     <div id="scanning-overlay">
@@ -201,8 +202,8 @@
 
     <a-scene
       mindar-image="imageTargetSrc: https://raw.githubusercontent.com/isaoinvest/webAR-TEST/main/targets.mind;
-                    warmupTolerance: 5;
-                    missTolerance: 10;
+                    [cite_start]warmupTolerance: 5; [cite: 31]
+                    [cite_start]missTolerance: 10; [cite: 31]
                     filterMinCF: 0.000001; 
                     filterBeta: 250;
                     uiScanning: #scanning-overlay;"
@@ -210,7 +211,8 @@
       renderer="colorManagement: true, physicallyCorrectLights"
       vr-mode-ui="enabled: false"
       device-orientation-permission-ui="enabled: false"
-      loading-screen="enabled: true; dotsColor: #fff; backgroundColor: #000"
+      loading-screen="enabled: true;
+                      [cite_start]dotsColor: #fff; backgroundColor: #000" [cite: 32]
     >
       <a-assets>
         <video
@@ -221,7 +223,8 @@
           crossorigin="anonymous"
           playsinline
           webkit-playsinline
-          muted
+         
+           [cite_start]muted [cite: 33]
         ></video>
         
         <video
@@ -232,7 +235,8 @@
           crossorigin="anonymous"
           playsinline
           webkit-playsinline
-          muted
+     
+           [cite_start]muted [cite: 34]
         ></video>
         
         <canvas id="transparent-canvas" width="1024" height="1024"></canvas>
@@ -241,8 +245,10 @@
       <a-camera
         position="0 0 0"
         look-controls="enabled: false"
-        cursor="fuse: false; rayOrigin: mouse;"
-        raycaster="far: 10000; objects: .clickable"
+        cursor="fuse: false;
+                [cite_start]rayOrigin: mouse;" [cite: 35]
+        raycaster="far: 10000;
+                   [cite_start]objects: .clickable" [cite: 36]
       ></a-camera>
 
       <a-entity
@@ -250,12 +256,12 @@
         mindar-image-target="targetIndex: 0"
       >
         <a-plane
-          id="video0-entity"
           position="0 0 0"
           rotation="0 0 0"
           width="1"
           height="1"
-          material="shader: flat; transparent: true; alphaTest: 0.01; side: double"
+          material="shader: flat; src: #transparent-canvas; transparent: true; side: double; depthWrite: false;"
+          transparent-video-updater
         ></a-plane>
       </a-entity>
     </a-scene>
@@ -269,180 +275,135 @@
           if (window.AFRAME) initApp();
           else window.addEventListener('load', initApp);
         });
-      }
+ 
+      [cite_start]} [cite: 39]
 
       function initApp() {
-        // 註冊透明影片材質組件
-        AFRAME.registerComponent('transparent-video-material', {
-          schema: {
-            canvas: {type: 'selector'}
-          },
-          
-          init: function() {
-            const canvas = this.data.canvas;
-            if (!canvas) return;
-            
-            // 創建 Three.js 紋理
-            const texture = new THREE.CanvasTexture(canvas);
-            texture.minFilter = THREE.LinearFilter;
-            texture.magFilter = THREE.LinearFilter;
-            texture.format = THREE.RGBAFormat;
-            texture.needsUpdate = true;
-            
-            // 創建材質
-            const material = new THREE.MeshBasicMaterial({
-              map: texture,
-              transparent: true,
-              alphaTest: 0.01,
-              side: THREE.DoubleSide,
-              depthWrite: false
+        // 修正: 註冊一個專門用來更新透明影片紋理的組件
+        AFRAME.registerComponent('transparent-video-updater', {
+          init: function () {
+            const el = this.el;
+            // 等待材質和紋理都載入完成後再獲取紋理物件
+            el.addEventListener('materialtextureloaded', () => {
+              const mesh = el.getObject3D('mesh');
+              if (mesh && mesh.material && mesh.material.map) {
+                this.texture = mesh.material.map;
+                // 確保紋理使用正確的色彩空間
+                this.texture.encoding = THREE.sRGBEncoding;
+              }
             });
-            
-            // 應用材質
-            this.el.getObject3D('mesh').material = material;
-            
-            // 保存參考以便更新
-            this.texture = texture;
-            this.canvas = canvas;
           },
-          
-          tick: function() {
-            // 每幀更新紋理
+          tick: function () {
+            // 在每一影格，如果紋理存在，就標記它需要更新
             if (this.texture) {
               this.texture.needsUpdate = true;
             }
           }
         });
-
-        // 透明影片處理類
+        
+        // 透明影片處理類 (原始代碼是正確的，無需修改)
         class TransparentVideoProcessor {
           constructor(foregroundVideo, alphaVideo, outputCanvas) {
             this.foregroundVideo = foregroundVideo;
-            this.alphaVideo = alphaVideo;
+            [cite_start]this.alphaVideo = alphaVideo; [cite: 48]
             this.outputCanvas = outputCanvas;
             this.outputCtx = outputCanvas.getContext('2d', { 
               alpha: true,
               willReadFrequently: true 
             });
-            this.processingCanvas = document.getElementById('processing-canvas');
+            [cite_start]this.processingCanvas = document.getElementById('processing-canvas'); [cite: 49]
             this.processingCtx = this.processingCanvas.getContext('2d', {
               willReadFrequently: true
             });
-            this.isProcessing = false;
+            [cite_start]this.isProcessing = false; [cite: 50]
             this.animationId = null;
-
-            // 設定尺寸的函數
-            this.setupSizes = () => {
-              const width = Math.max(this.foregroundVideo.videoWidth, this.alphaVideo.videoWidth || 1024);
-              const height = Math.max(this.foregroundVideo.videoHeight, this.alphaVideo.videoHeight || 1024);
-              if (width > 0 && height > 0) {
-                this.outputCanvas.width = width;
-                this.outputCanvas.height = height;
-                this.processingCanvas.width = width;
-                this.processingCanvas.height = height;
-                console.log('Canvas 尺寸設定為:', width, 'x', height);
-              }
-            };
-
-            // 監聽 metadata 載入
-            this.foregroundVideo.addEventListener('loadedmetadata', this.setupSizes);
-            this.alphaVideo.addEventListener('loadedmetadata', this.setupSizes);
-
-            // 立即嘗試設定
-            this.setupSizes();
           }
 
           start() {
             if (this.isProcessing) return;
-            this.isProcessing = true;
+            [cite_start]this.isProcessing = true; [cite: 51]
             this.process();
           }
 
           stop() {
-            this.isProcessing = false;
+            [cite_start]this.isProcessing = false; [cite: 52]
             if (this.animationId) {
               cancelAnimationFrame(this.animationId);
-              this.animationId = null;
+              [cite_start]this.animationId = null; [cite: 53]
             }
           }
 
           process() {
-            if (!this.isProcessing) return;
+            [cite_start]if (!this.isProcessing) return; [cite: 54]
+            if (this.foregroundVideo.readyState >= 2 && this.alphaVideo.readyState >= 2) {
+              const width = this.foregroundVideo.videoWidth || [cite_start]1024; [cite: 55]
+              const height = this.foregroundVideo.videoHeight || 1024;
 
-            // 檢查影片是否準備好
-            if (this.foregroundVideo.readyState < 3 || this.alphaVideo.readyState < 3 ||
-                !this.foregroundVideo.videoWidth || !this.alphaVideo.videoWidth) {
-              this.animationId = requestAnimationFrame(() => this.process());
-              return;
-            }
-
-            const width = this.foregroundVideo.videoWidth;
-            const height = this.foregroundVideo.videoHeight;
-
-            try {
-              // 清除canvas並設置完全透明背景
-              this.outputCtx.clearRect(0, 0, width, height);
-              
-              // 繪製前景影片
-              this.outputCtx.drawImage(this.foregroundVideo, 0, 0, width, height);
-              
-              // 獲取前景像素資料
-              const foregroundImageData = this.outputCtx.getImageData(0, 0, width, height);
-              const foregroundData = foregroundImageData.data;
-
-              // 繪製alpha影片到處理canvas
-              this.processingCtx.clearRect(0, 0, width, height);
-              this.processingCtx.drawImage(this.alphaVideo, 0, 0, width, height);
-              const alphaImageData = this.processingCtx.getImageData(0, 0, width, height);
-              const alphaData = alphaImageData.data;
-
-              // 合成透明效果
-              for (let i = 0; i < foregroundData.length; i += 4) {
-                // 使用alpha影片的灰度平均值作為透明度
-                const r = alphaData[i];
-                const g = alphaData[i + 1];
-                const b = alphaData[i + 2];
-                const alphaValue = Math.round((r + g + b) / 3);
-                
-                // 設定透明度
-                foregroundData[i + 3] = alphaValue;
-                
-                // 如果alpha很低，也降低RGB值以避免邊緣問題
-                if (alphaValue < 10) {
-                  foregroundData[i] = 0;
-                  foregroundData[i + 1] = 0;
-                  foregroundData[i + 2] = 0;
-                }
+              // 設定canvas尺寸
+              if (this.outputCanvas.width !== width || this.outputCanvas.height !== height) {
+                this.outputCanvas.width = width;
+                [cite_start]this.outputCanvas.height = height; [cite: 56]
+                this.processingCanvas.width = width;
+                this.processingCanvas.height = height;
               }
 
-              // 將處理後的資料繪製到輸出canvas
-              this.outputCtx.putImageData(foregroundImageData, 0, 0);
-              
-            } catch (error) {
-              console.warn('影片處理錯誤:', error);
+              try {
+                // 清除canvas並設置完全透明背景
+                this.outputCtx.clearRect(0, 0, width, height);
+                // 繪製前景影片
+                [cite_start]this.outputCtx.drawImage(this.foregroundVideo, 0, 0, width, height); [cite: 57]
+                // 獲取前景像素資料
+                [cite_start]const foregroundImageData = this.outputCtx.getImageData(0, 0, width, height); [cite: 58]
+                const foregroundData = foregroundImageData.data;
+
+                // 繪製alpha影片到處理canvas
+                this.processingCtx.clearRect(0, 0, width, height);
+                [cite_start]this.processingCtx.drawImage(this.alphaVideo, 0, 0, width, height); [cite: 60]
+                const alphaImageData = this.processingCtx.getImageData(0, 0, width, height);
+                const alphaData = alphaImageData.data;
+                // 合成透明效果
+                for (let i = 0; i < foregroundData.length; i += 4) {
+                  // 使用alpha影片的灰度值作為透明度
+                  // 取紅色通道或計算灰度平均值
+                  [cite_start]const alphaValue = alphaData[i]; [cite: 62] // 使用紅色通道
+                  
+                  // 設定透明度
+                  foregroundData[i + 3] = alphaValue;
+                  // 如果alpha很低，也降低RGB值以避免邊緣問題
+                  if (alphaValue < 10) {
+                    foregroundData[i] = 0;
+                    [cite_start]foregroundData[i + 1] = 0; [cite: 64]
+                    foregroundData[i + 2] = 0;
+                  [cite_start]} [cite: 65]
+                }
+
+                // 將處理後的資料繪製到輸出canvas
+                [cite_start]this.outputCtx.putImageData(foregroundImageData, 0, 0); [cite: 66]
+              } catch (error) {
+                [cite_start]console.warn('影片處理錯誤:', error); [cite: 67]
+              }
             }
 
-            this.animationId = requestAnimationFrame(() => this.process());
+            [cite_start]this.animationId = requestAnimationFrame(() => this.process()); [cite: 68]
           }
         }
 
         // 主要元素變數宣告
-        const foregroundVideo = document.querySelector("#foreground-video");
-        const alphaVideo = document.querySelector("#alpha-video-asset");
+        [cite_start]const foregroundVideo = document.querySelector("#foreground-video"); [cite: 69]
+        [cite_start]const alphaVideo = document.querySelector("#alpha-video-asset"); [cite: 69]
         const transparentCanvas = document.querySelector("#transparent-canvas");
         const targetEl = document.querySelector("#target0");
         const scanningOverlay = document.getElementById("scanning-overlay");
-        const playButton = document.getElementById("play-button");
-        const soundButton = document.getElementById("sound-button");
+        [cite_start]const playButton = document.getElementById("play-button"); [cite: 70]
+        [cite_start]const soundButton = document.getElementById("sound-button"); [cite: 70]
         const fullscreenButton = document.getElementById("fullscreen-button");
         const fullscreenContainer = document.getElementById("fullscreen-container");
         const fullscreenCanvas = document.getElementById("fullscreen-canvas");
-        const progressBar = document.getElementById("progress-bar");
-        
+        [cite_start]const progressBar = document.getElementById("progress-bar"); [cite: 71]
         // 圖標元素
-        const playIcon = document.getElementById("play-icon");
-        const pauseIcon = document.getElementById("pause-icon");
-        const soundOnIcon = document.getElementById("sound-on-icon");
+        [cite_start]const playIcon = document.getElementById("play-icon"); [cite: 71]
+        [cite_start]const pauseIcon = document.getElementById("pause-icon"); [cite: 72]
+        [cite_start]const soundOnIcon = document.getElementById("sound-on-icon"); [cite: 72]
         const soundOffIcon = document.getElementById("sound-off-icon");
 
         // 創建透明影片處理器
@@ -451,20 +412,10 @@
           alphaVideo, 
           transparentCanvas
         );
-
         // 全螢幕處理器
-        let fullscreenProcessor = null;
-
-        // 初始化canvas紋理
-        function initCanvasTexture() {
-          const videoEntity = document.querySelector("#video0-entity");
-          if (videoEntity && transparentCanvas) {
-            // 使用自定義組件
-            videoEntity.setAttribute("transparent-video-material", {
-              canvas: "#transparent-canvas"
-            });
-          }
-        }
+        [cite_start]let fullscreenProcessor = null; [cite: 73]
+        
+        // 移除: initCanvasTexture 函數不再需要
 
         // 狀態管理
         const state = {
@@ -474,31 +425,31 @@
           fullscreen: false,
           hasPlayed: false,
           sceneLoaded: false
-        };
+      
+        [cite_start]}; [cite: 77]
 
         // 場景載入完成事件
         document.querySelector('a-scene').addEventListener('loaded', () => {
           state.sceneLoaded = true;
           console.log('A-Frame場景已載入');
-        });
-
+        [cite_start]}); [cite: 78]
         // 更新按鈕圖標
         function updateButtons() {
-          playIcon.style.display = state.isPlaying ? "none" : "block";
+          playIcon.style.display = state.isPlaying ? [cite_start]"none" : "block"; [cite: 79]
           pauseIcon.style.display = state.isPlaying ? "block" : "none";
           playButton.classList.toggle("active", state.isPlaying);
           
-          soundOnIcon.style.display = state.audioEnabled ? "block" : "none";
-          soundOffIcon.style.display = state.audioEnabled ? "none" : "block";
+          soundOnIcon.style.display = state.audioEnabled ? [cite_start]"block" : "none"; [cite: 80]
+          soundOffIcon.style.display = state.audioEnabled ? [cite_start]"none" : "block"; [cite: 80]
           soundButton.classList.toggle("active", state.audioEnabled);
         }
 
         // 音訊控制
         function toggleAudio() {
-          state.audioEnabled = !state.audioEnabled;
-          foregroundVideo.muted = !state.audioEnabled;
+          [cite_start]state.audioEnabled = !state.audioEnabled; [cite: 81]
+          [cite_start]foregroundVideo.muted = !state.audioEnabled; [cite: 81]
           alphaVideo.muted = true; // alpha影片始終靜音
-          updateButtons();
+          [cite_start]updateButtons(); [cite: 82]
         }
 
         // 影片播放控制
@@ -506,45 +457,44 @@
           try {
             // 確保影片同步
             const targetTime = foregroundVideo.currentTime;
-            alphaVideo.currentTime = targetTime;
+            [cite_start]alphaVideo.currentTime = targetTime; [cite: 83]
             
             const playPromises = [
               foregroundVideo.play(),
               alphaVideo.play()
             ];
-            
-            await Promise.all(playPromises);
+            [cite_start]await Promise.all(playPromises); [cite: 84]
             state.isPlaying = true;
             transparentProcessor.start();
             
             if (fullscreenProcessor) {
-              fullscreenProcessor.start();
+              [cite_start]fullscreenProcessor.start(); [cite: 85]
             }
             
-            updateButtons();
+            [cite_start]updateButtons(); [cite: 86]
             console.log('影片開始播放');
           } catch (error) {
-            console.warn('播放失敗，嘗試靜音播放:', error);
-            foregroundVideo.muted = true;
+            [cite_start]console.warn('播放失敗，嘗試靜音播放:', error); [cite: 87]
+            [cite_start]foregroundVideo.muted = true; [cite: 87]
             alphaVideo.muted = true;
             state.audioEnabled = false;
             
             try {
               await Promise.all([foregroundVideo.play(), alphaVideo.play()]);
-              state.isPlaying = true;
+              [cite_start]state.isPlaying = true; [cite: 88]
               transparentProcessor.start();
               if (fullscreenProcessor) fullscreenProcessor.start();
               updateButtons();
               console.log('靜音播放成功');
             } catch (retryError) {
-              console.error('影片播放失敗:', retryError);
+              [cite_start]console.error('影片播放失敗:', retryError); [cite: 89]
             }
           }
         }
 
         function pauseVideos() {
-          foregroundVideo.pause();
-          alphaVideo.pause();
+          [cite_start]foregroundVideo.pause(); [cite: 90]
+          [cite_start]alphaVideo.pause(); [cite: 90]
           state.isPlaying = false;
           transparentProcessor.stop();
           if (fullscreenProcessor) fullscreenProcessor.stop();
@@ -553,42 +503,35 @@
 
         // 播放/暫停切換
         function togglePlayPause() {
-          if (!state.hasPlayed) return;
-          
+          [cite_start]if (!state.hasPlayed) return; [cite: 91]
           if (state.isPlaying) {
-            pauseVideos();
+            [cite_start]pauseVideos(); [cite: 92]
           } else {
-            playVideos();
+            [cite_start]playVideos(); [cite: 93]
           }
         }
 
         // 全螢幕切換
         function toggleFullscreen() {
-          if (!state.hasPlayed) return;
-          
+          [cite_start]if (!state.hasPlayed) return; [cite: 94]
           if (state.fullscreen) {
             // 退出全螢幕
-            fullscreenContainer.classList.remove("visible");
-            state.fullscreen = false;
+            [cite_start]fullscreenContainer.classList.remove("visible"); [cite: 95]
+            [cite_start]state.fullscreen = false; [cite: 95]
             if (fullscreenProcessor) {
               fullscreenProcessor.stop();
-              fullscreenProcessor = null;
+              [cite_start]fullscreenProcessor = null; [cite: 96]
             }
             
             if (state.targetFound && state.isPlaying) {
-              transparentProcessor.start();
+              [cite_start]transparentProcessor.start(); [cite: 97]
             } else if (!state.targetFound) {
-              scanningOverlay.classList.remove("hidden");
+              [cite_start]scanningOverlay.classList.remove("hidden"); [cite: 98]
             }
           } else {
             // 進入全螢幕
-            // 停止 AR 處理器以避免衝突
-            if (transparentProcessor && transparentProcessor.isProcessing) {
-              transparentProcessor.stop();
-            }
-            
-            fullscreenContainer.classList.add("visible");
-            state.fullscreen = true;
+            [cite_start]fullscreenContainer.classList.add("visible"); [cite: 99]
+            [cite_start]state.fullscreen = true; [cite: 99]
             
             // 創建全螢幕處理器
             fullscreenProcessor = new TransparentVideoProcessor(
@@ -596,9 +539,8 @@
               alphaVideo,
               fullscreenCanvas
             );
-            
             if (state.isPlaying) {
-              fullscreenProcessor.start();
+              [cite_start]fullscreenProcessor.start(); [cite: 101]
             }
           }
         }
@@ -607,13 +549,13 @@
         function updateProgress() {
           if (foregroundVideo && foregroundVideo.duration) {
             const progress = (foregroundVideo.currentTime / foregroundVideo.duration) * 100;
-            progressBar.style.width = progress + "%";
+            [cite_start]progressBar.style.width = progress + "%"; [cite: 102]
           }
         }
 
         // 按鈕事件
-        playButton.addEventListener("click", togglePlayPause);
-        soundButton.addEventListener("click", toggleAudio);
+        [cite_start]playButton.addEventListener("click", togglePlayPause); [cite: 103]
+        [cite_start]soundButton.addEventListener("click", toggleAudio); [cite: 103]
         fullscreenButton.addEventListener("click", toggleFullscreen);
         
         // 全螢幕點擊退出
@@ -621,13 +563,11 @@
           if (e.target === fullscreenContainer || e.target === fullscreenCanvas) {
             toggleFullscreen();
           }
-        });
-
+        [cite_start]}); [cite: 104]
         // 影片進度更新
-        foregroundVideo.addEventListener("timeupdate", updateProgress);
-
+        [cite_start]foregroundVideo.addEventListener("timeupdate", updateProgress); [cite: 105]
         // 同步兩個影片的播放時間
-        let syncTimer = null;
+        [cite_start]let syncTimer = null; [cite: 106]
         foregroundVideo.addEventListener("timeupdate", () => {
           if (syncTimer) clearTimeout(syncTimer);
           syncTimer = setTimeout(() => {
@@ -635,8 +575,7 @@
               alphaVideo.currentTime = foregroundVideo.currentTime;
             }
           }, 100);
-        });
-
+        [cite_start]}); [cite: 107]
         // 目標事件處理
         targetEl.addEventListener("targetFound", () => {
           console.log('目標找到');
@@ -649,17 +588,17 @@
           
           // 確保材質已設置
           setTimeout(() => {
-            initCanvasTexture();
+            // 移除: 不再需要手動呼叫 initCanvasTexture();
             
             // 重置並播放影片
             foregroundVideo.currentTime = 0;
             alphaVideo.currentTime = 0;
-            playVideos();
+            
+            [cite_start]playVideos(); [cite: 109]
           }, 100);
           
           scanningOverlay.classList.add("hidden");
-        });
-
+        [cite_start]}); [cite: 110]
         targetEl.addEventListener("targetLost", () => {
           console.log('目標丟失');
           state.targetFound = false;
@@ -669,12 +608,12 @@
           if (!state.fullscreen) {
             setTimeout(() => {
               if (!state.targetFound) {
-                scanningOverlay.classList.remove("hidden");
+   
+                           [cite_start]scanningOverlay.classList.remove("hidden"); [cite: 111]
               }
             }, 200);
           }
-        });
-
+        [cite_start]}); [cite: 112]
         // 頁面可見性處理
         document.addEventListener("visibilitychange", () => {
           if (document.hidden) {
@@ -682,8 +621,7 @@
           } else if (state.targetFound && state.isPlaying) {
             playVideos();
           }
-        });
-
+        [cite_start]}); [cite: 113]
         // 初始化
         updateButtons();
         console.log('應用初始化完成');
