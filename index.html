@@ -119,6 +119,8 @@
         transition: width 0.2s;
       }
 
+      /* 移除: 全螢幕相關 CSS 已刪除 */
+
       /* 隱藏的透明處理元素 */
       .hidden-elements {
         position: absolute;
@@ -148,7 +150,8 @@
           <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
         </svg>
       </button>
-    </div>
+
+      </div>
 
     <div class="progress-container">
       <div class="progress-bar" id="progress-bar"></div>
@@ -159,7 +162,7 @@
         <div class="scanner-line"></div>
       </div>
     </div>
-
+    
     <div class="hidden-elements">
       <canvas id="processing-canvas"></canvas>
     </div>
@@ -175,7 +178,8 @@
       renderer="colorManagement: true, physicallyCorrectLights"
       vr-mode-ui="enabled: false"
       device-orientation-permission-ui="enabled: false"
-      loading-screen="enabled: true; dotsColor: #fff; backgroundColor: #000"
+      loading-screen="enabled: true;
+                      dotsColor: #fff; backgroundColor: #000"
     >
       <a-assets>
         <video
@@ -206,8 +210,10 @@
       <a-camera
         position="0 0 0"
         look-controls="enabled: false"
-        cursor="fuse: false; rayOrigin: mouse;"
-        raycaster="far: 10000; objects: .clickable"
+        cursor="fuse: false;
+                rayOrigin: mouse;"
+        raycaster="far: 10000;
+                   objects: .clickable"
       ></a-camera>
 
       <a-entity
@@ -215,12 +221,12 @@
         mindar-image-target="targetIndex: 0"
       >
         <a-plane
-          id="video0-entity"
           position="0 0 0"
           rotation="0 0 0"
           width="1"
           height="1"
-          material="shader: flat; transparent: true; alphaTest: 0.001; side: double"
+          material="shader: flat; src: #transparent-canvas; transparent: true; side: double; depthWrite: false;"
+          transparent-video-updater
         ></a-plane>
       </a-entity>
     </a-scene>
@@ -237,48 +243,25 @@
       }
 
       function initApp() {
-        // 註冊透明影片材質組件
-        AFRAME.registerComponent('transparent-video-material', {
-          schema: {
-            canvas: {type: 'selector'}
-          },
-          
-          init: function() {
-            const canvas = this.data.canvas;
-            if (!canvas) return;
-            
-            // 創建 Three.js 紋理
-            const texture = new THREE.CanvasTexture(canvas);
-            texture.minFilter = THREE.LinearFilter;
-            texture.magFilter = THREE.LinearFilter;
-            texture.format = THREE.RGBAFormat;
-            texture.needsUpdate = true;
-            
-            // 創建材質
-            const material = new THREE.MeshBasicMaterial({
-              map: texture,
-              transparent: true,
-              alphaTest: 0.001,
-              side: THREE.DoubleSide,
-              depthWrite: false
+        // 註冊一個專門用來更新透明影片紋理的組件
+        AFRAME.registerComponent('transparent-video-updater', {
+          init: function () {
+            const el = this.el;
+            el.addEventListener('materialtextureloaded', () => {
+              const mesh = el.getObject3D('mesh');
+              if (mesh && mesh.material && mesh.material.map) {
+                this.texture = mesh.material.map;
+                this.texture.encoding = THREE.sRGBEncoding;
+              }
             });
-            
-            // 應用材質
-            this.el.getObject3D('mesh').material = material;
-            
-            // 保存參考以便更新
-            this.texture = texture;
-            this.canvas = canvas;
           },
-          
-          tick: function() {
-            // 每幀更新紋理
+          tick: function () {
             if (this.texture) {
               this.texture.needsUpdate = true;
             }
           }
         });
-
+        
         // 透明影片處理類
         class TransparentVideoProcessor {
           constructor(foregroundVideo, alphaVideo, outputCanvas) {
@@ -295,26 +278,6 @@
             });
             this.isProcessing = false;
             this.animationId = null;
-
-            // 設定尺寸的函數
-            this.setupSizes = () => {
-              const width = Math.max(this.foregroundVideo.videoWidth, this.alphaVideo.videoWidth || 1024);
-              const height = Math.max(this.foregroundVideo.videoHeight, this.alphaVideo.videoHeight || 1024);
-              if (width > 0 && height > 0) {
-                this.outputCanvas.width = width;
-                this.outputCanvas.height = height;
-                this.processingCanvas.width = width;
-                this.processingCanvas.height = height;
-                console.log('Canvas 尺寸設定為:', width, 'x', height);
-              }
-            };
-
-            // 監聽 metadata 載入
-            this.foregroundVideo.addEventListener('loadedmetadata', this.setupSizes);
-            this.alphaVideo.addEventListener('loadedmetadata', this.setupSizes);
-
-            // 立即嘗試設定
-            this.setupSizes();
           }
 
           start() {
@@ -333,61 +296,50 @@
 
           process() {
             if (!this.isProcessing) return;
+            if (this.foregroundVideo.readyState >= 2 && this.alphaVideo.readyState >= 2) {
+              const width = this.foregroundVideo.videoWidth || 1024;
+              const height = this.foregroundVideo.videoHeight || 1024;
 
-            // 檢查影片是否準備好
-            if (this.foregroundVideo.readyState < 3 || this.alphaVideo.readyState < 3 ||
-                !this.foregroundVideo.videoWidth || !this.alphaVideo.videoWidth) {
-              this.animationId = requestAnimationFrame(() => this.process());
-              return;
-            }
-
-            const width = this.foregroundVideo.videoWidth;
-            const height = this.foregroundVideo.videoHeight;
-
-            try {
-              // 清除canvas並設置完全透明背景
-              this.outputCtx.clearRect(0, 0, width, height);
-              
-              // 繪製前景影片
-              this.outputCtx.drawImage(this.foregroundVideo, 0, 0, width, height);
-              
-              // 獲取前景像素資料
-              const foregroundImageData = this.outputCtx.getImageData(0, 0, width, height);
-              const foregroundData = foregroundImageData.data;
-
-              // 繪製alpha影片到處理canvas
-              this.processingCtx.clearRect(0, 0, width, height);
-              this.processingCtx.drawImage(this.alphaVideo, 0, 0, width, height);
-              const alphaImageData = this.processingCtx.getImageData(0, 0, width, height);
-              const alphaData = alphaImageData.data;
-
-              // 合成透明效果 - 調整為更透明：使用更低的閾值，並將alphaValue乘以0.8來增強透明度
-              for (let i = 0; i < foregroundData.length; i += 4) {
-                // 使用alpha影片的灰度平均值作為透明度
-                const r = alphaData[i];
-                const g = alphaData[i + 1];
-                const b = alphaData[i + 2];
-                let alphaValue = Math.round((r + g + b) / 3);
-                
-                // 增強透明度：乘以0.8，讓整體更透明
-                alphaValue = Math.floor(alphaValue * 0.8);
-                
-                // 設定透明度
-                foregroundData[i + 3] = alphaValue;
-                
-                // 如果alpha很低（調整閾值為5），完全清除RGB以避免殘留
-                if (alphaValue < 5) {
-                  foregroundData[i] = 0;
-                  foregroundData[i + 1] = 0;
-                  foregroundData[i + 2] = 0;
-                }
+              if (this.outputCanvas.width !== width || this.outputCanvas.height !== height) {
+                this.outputCanvas.width = width;
+                this.outputCanvas.height = height;
+                this.processingCanvas.width = width;
+                this.processingCanvas.height = height;
               }
 
-              // 將處理後的資料繪製到輸出canvas
-              this.outputCtx.putImageData(foregroundImageData, 0, 0);
-              
-            } catch (error) {
-              console.warn('影片處理錯誤:', error);
+              try {
+                this.outputCtx.clearRect(0, 0, width, height);
+                this.outputCtx.drawImage(this.foregroundVideo, 0, 0, width, height);
+                const foregroundImageData = this.outputCtx.getImageData(0, 0, width, height);
+                const foregroundData = foregroundImageData.data;
+
+                this.processingCtx.clearRect(0, 0, width, height);
+                this.processingCtx.drawImage(this.alphaVideo, 0, 0, width, height);
+                const alphaImageData = this.processingCtx.getImageData(0, 0, width, height);
+                const alphaData = alphaImageData.data;
+                
+                for (let i = 0; i < foregroundData.length; i += 4) {
+                  let alphaValue = alphaData[i];
+                  
+                  // 修改: 增加透明度閾值處理
+                  // 如果遮罩影片的像素值低於 25 (接近黑色)，則視為完全透明
+                  if (alphaValue < 25) {
+                    alphaValue = 0;
+                  }
+                  
+                  foregroundData[i + 3] = alphaValue;
+                  
+                  if (alphaValue < 10) {
+                    foregroundData[i] = 0;
+                    foregroundData[i + 1] = 0;
+                    foregroundData[i + 2] = 0;
+                  }
+                }
+
+                this.outputCtx.putImageData(foregroundImageData, 0, 0);
+              } catch (error) {
+                console.warn('影片處理錯誤:', error);
+              }
             }
 
             this.animationId = requestAnimationFrame(() => this.process());
@@ -403,7 +355,6 @@
         const playButton = document.getElementById("play-button");
         const soundButton = document.getElementById("sound-button");
         const progressBar = document.getElementById("progress-bar");
-        
         // 圖標元素
         const playIcon = document.getElementById("play-icon");
         const pauseIcon = document.getElementById("pause-icon");
@@ -416,17 +367,8 @@
           alphaVideo, 
           transparentCanvas
         );
-
-        // 初始化canvas紋理
-        function initCanvasTexture() {
-          const videoEntity = document.querySelector("#video0-entity");
-          if (videoEntity && transparentCanvas) {
-            // 使用自定義組件
-            videoEntity.setAttribute("transparent-video-material", {
-              canvas: "#transparent-canvas"
-            });
-          }
-        }
+        
+        // 移除: 全螢幕處理器已刪除
 
         // 狀態管理
         const state = {
@@ -458,23 +400,17 @@
         function toggleAudio() {
           state.audioEnabled = !state.audioEnabled;
           foregroundVideo.muted = !state.audioEnabled;
-          alphaVideo.muted = true; // alpha影片始終靜音
+          alphaVideo.muted = true;
           updateButtons();
         }
 
         // 影片播放控制
         async function playVideos() {
           try {
-            // 確保影片同步
             const targetTime = foregroundVideo.currentTime;
             alphaVideo.currentTime = targetTime;
             
-            const playPromises = [
-              foregroundVideo.play(),
-              alphaVideo.play()
-            ];
-            
-            await Promise.all(playPromises);
+            await Promise.all([foregroundVideo.play(), alphaVideo.play()]);
             state.isPlaying = true;
             transparentProcessor.start();
             
@@ -509,13 +445,14 @@
         // 播放/暫停切換
         function togglePlayPause() {
           if (!state.hasPlayed) return;
-          
           if (state.isPlaying) {
             pauseVideos();
           } else {
             playVideos();
           }
         }
+
+        // 移除: toggleFullscreen 函數已刪除
 
         // 進度更新
         function updateProgress() {
@@ -528,10 +465,10 @@
         // 按鈕事件
         playButton.addEventListener("click", togglePlayPause);
         soundButton.addEventListener("click", toggleAudio);
+        // 移除: 全螢幕按鈕事件已刪除
         
         // 影片進度更新
         foregroundVideo.addEventListener("timeupdate", updateProgress);
-
         // 同步兩個影片的播放時間
         let syncTimer = null;
         foregroundVideo.addEventListener("timeupdate", () => {
@@ -549,11 +486,7 @@
           state.targetFound = true;
           state.hasPlayed = true;
           
-          // 確保材質已設置
           setTimeout(() => {
-            initCanvasTexture();
-            
-            // 重置並播放影片
             foregroundVideo.currentTime = 0;
             alphaVideo.currentTime = 0;
             playVideos();
@@ -565,7 +498,6 @@
         targetEl.addEventListener("targetLost", () => {
           console.log('目標丟失');
           state.targetFound = false;
-          
           pauseVideos();
           
           setTimeout(() => {
