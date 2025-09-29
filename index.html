@@ -181,7 +181,7 @@
           rotation="0 0 0"
           width="1"
           height="1"
-          chroma-key-material="src: #greenscreen-video; color: 0.1 0.9 0.2; threshold: 0.3; smoothness: 0.2"
+          chroma-key-material="src: #greenscreen-video; color: 0 1 0; similarity: 0.2; smoothness: 0.03; spill: 0.4"
         ></a-plane>
       </a-entity>
     </a-scene>
@@ -197,13 +197,14 @@
       }
 
       function initApp() {
-        // 使用更精確的 YUV 色彩空間去背算法
+        // 使用改進的 YUV 色彩空間去背算法，包含 spill suppression
         AFRAME.registerComponent('chroma-key-material', {
           schema: {
             src: { type: 'selector' },
             color: { type: 'vec3', default: {x: 0.0, y: 1.0, z: 0.0} },
-            threshold: { type: 'number', default: 0.5 },
-            smoothness: { type: 'number', default: 0.05 }
+            similarity: { type: 'number', default: 0.2 },
+            smoothness: { type: 'number', default: 0.03 },
+            spill: { type: 'number', default: 0.4 }
           },
 
           init: function () {
@@ -225,36 +226,41 @@
               }
             `;
 
-            // *** 核心修改：Fragment Shader 採用 YUV 算法，並處理負值 ***
+            // *** 改進的 Fragment Shader：採用標準 chroma key 與 spill suppression ***
             const fragmentShader = `
               uniform sampler2D u_texture;
               uniform vec3 u_keyColor;
-              uniform float u_threshold;
+              uniform float u_similarity;
               uniform float u_smoothness;
+              uniform float u_spill;
               varying vec2 vUv;
 
-              // RGB 轉 YUV 函數
-              vec3 rgb2yuv(vec3 rgb){
-                float y = 0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b;
-                float u = -0.14713 * rgb.r - 0.28886 * rgb.g + 0.436 * rgb.b;
-                float v = 0.615 * rgb.r - 0.51499 * rgb.g - 0.10001 * rgb.b;
-                return vec3(y, u, v);
+              // RGB 轉 UV (chroma) 函數，normalized to 0-1
+              vec2 RGBtoUV(vec3 rgb) {
+                return vec2(
+                  rgb.r * -0.169 + rgb.g * -0.331 + rgb.b *  0.5    + 0.5,
+                  rgb.r *  0.5   + rgb.g * -0.419 + rgb.b * -0.081  + 0.5
+                );
               }
 
               void main() {
-                vec3 texColor = texture2D(u_texture, vUv).rgb;
+                vec4 rgba = texture2D(u_texture, vUv);
+                vec3 texColor = rgba.rgb;
                 
-                // 將像素顏色和目標綠色轉為 YUV
-                vec3 pixel_yuv = rgb2yuv(texColor);
-                vec3 key_yuv = rgb2yuv(u_keyColor);
+                // 計算 chroma 距離
+                float chromaDist = distance(RGBtoUV(texColor), RGBtoUV(u_keyColor));
                 
-                // 只計算色彩(UV)的距離，忽略亮度(Y)，並處理負值
-                float chroma_dist = distance(abs(pixel_yuv.yz), abs(key_yuv.yz));
+                // 計算 alpha mask (0 for key/transparent, 1 for opaque)
+                float baseMask = chromaDist - u_similarity;
+                float fullMask = pow(clamp(baseMask / u_smoothness, 0.0, 1.0), 1.5);
+                float alpha = fullMask;
                 
-                // 根據色彩距離計算透明度
-                float alpha = smoothstep(u_threshold, u_threshold + u_smoothness, chroma_dist);
+                // Spill suppression: 去飽和邊緣像素以移除綠色溢出
+                float spillVal = pow(clamp(baseMask / u_spill, 0.0, 1.0), 1.5);
+                float desat = clamp(texColor.r * 0.2126 + texColor.g * 0.7152 + texColor.b * 0.0722, 0.0, 1.0);
+                vec3 suppressedColor = mix(vec3(desat), texColor, spillVal);
                 
-                gl_FragColor = vec4(texColor, alpha);
+                gl_FragColor = vec4(suppressedColor, alpha);
               }
             `;
             
@@ -262,8 +268,9 @@
               uniforms: {
                 u_texture: { value: videoTexture },
                 u_keyColor: { value: new THREE.Color(this.data.color.x, this.data.color.y, this.data.color.z) },
-                u_threshold: { value: this.data.threshold },
-                u_smoothness: { value: this.data.smoothness }
+                u_similarity: { value: this.data.similarity },
+                u_smoothness: { value: this.data.smoothness },
+                u_spill: { value: this.data.spill }
               },
               vertexShader: vertexShader,
               fragmentShader: fragmentShader,
