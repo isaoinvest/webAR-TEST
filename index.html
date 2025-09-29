@@ -5,9 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <link rel="preconnect" href="https://aframe.io" />
-    <link rel="preconnect" href="https://cdn.jsdelivr.net" />
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.2/dist/mindar-image-aframe.prod.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.2/dist/mindar-image-aframe.prod.js" onerror="console.error('MindAR 載入失敗')"></script>
 
     <style>
       body {
@@ -30,7 +29,6 @@
         justify-content: center;
         pointer-events: none;
         background-color: rgba(0, 0, 0, 0.1);
-        transition: opacity 0.3s;
       }
 
       #scanning-overlay.hidden {
@@ -110,6 +108,7 @@
         border-radius: 2px;
         z-index: 1000;
         overflow: hidden;
+        cursor: pointer;
       }
 
       .progress-bar {
@@ -122,7 +121,7 @@
   </head>
   <body>
     <div class="controls-container">
-      <button class="icon-button" id="play-button">
+      <button class="icon-button" id="play-button" aria-label="播放/暫停">
         <svg viewBox="0 0 24 24" id="play-icon">
           <path d="M8 5v14l11-7z"/>
         </svg>
@@ -131,7 +130,7 @@
         </svg>
       </button>
       
-      <button class="icon-button" id="sound-button">
+      <button class="icon-button" id="sound-button" aria-label="開啟/關閉音頻">
         <svg viewBox="0 0 24 24" id="sound-on-icon" style="display:none;">
           <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
         </svg>
@@ -141,7 +140,7 @@
       </button>
     </div>
 
-    <div class="progress-container">
+    <div class="progress-container" id="progress-container">
       <div class="progress-bar" id="progress-bar"></div>
     </div>
 
@@ -160,7 +159,7 @@
       renderer="colorManagement: true, physicallyCorrectLights"
       vr-mode-ui="enabled: false"
       device-orientation-permission-ui="enabled: false"
-      loading-screen="enabled: true; dotsColor: #fff; backgroundColor: #000"
+      loading-screen="enabled: true; dotsColor: #fff; backgroundColor: #000; wording: 載入中...;"
     >
       <a-assets>
         <video
@@ -170,7 +169,6 @@
           loop
           crossorigin="anonymous"
           playsinline
-          webkit-playsinline
           muted
         ></video>
       </a-assets>
@@ -217,6 +215,7 @@
             videoTexture.magFilter = THREE.LinearFilter;
             videoTexture.format = THREE.RGBFormat;
             videoTexture.encoding = THREE.sRGBEncoding;
+            videoTexture.generateMipmaps = false; // 性能優化：視頻不需mipmap
 
             const vertexShader = `
               varying vec2 vUv;
@@ -226,7 +225,7 @@
               }
             `;
 
-            // *** 核心修改：Fragment Shader 採用 YUV 算法 ***
+            // *** 核心修改：Fragment Shader 採用 YUV 算法，並處理負值 ***
             const fragmentShader = `
               uniform sampler2D u_texture;
               uniform vec3 u_keyColor;
@@ -249,8 +248,8 @@
                 vec3 pixel_yuv = rgb2yuv(texColor);
                 vec3 key_yuv = rgb2yuv(u_keyColor);
                 
-                // 只計算色彩(UV)的距離，忽略亮度(Y)
-                float chroma_dist = distance(pixel_yuv.yz, key_yuv.yz);
+                // 只計算色彩(UV)的距離，忽略亮度(Y)，並處理負值
+                float chroma_dist = distance(abs(pixel_yuv.yz), abs(key_yuv.yz));
                 
                 // 根據色彩距離計算透明度
                 float alpha = smoothstep(u_threshold, u_threshold + u_smoothness, chroma_dist);
@@ -284,12 +283,13 @@
           }
         });
 
-        // --- 主程式邏輯 (無需修改) ---
+        // --- 主程式邏輯 (優化版) ---
         const video = document.querySelector("#greenscreen-video");
         const targetEl = document.querySelector("#target0");
         const scanningOverlay = document.getElementById("scanning-overlay");
         const playButton = document.getElementById("play-button");
         const soundButton = document.getElementById("sound-button");
+        const progressContainer = document.getElementById("progress-container");
         const progressBar = document.getElementById("progress-bar");
         const playIcon = document.getElementById("play-icon");
         const pauseIcon = document.getElementById("pause-icon");
@@ -299,31 +299,32 @@
         const state = {
           targetFound: false,
           audioEnabled: false,
-          isPlaying: false,
-          hasPlayed: false
+          isPlaying: false
         };
 
-        function updateButtons() {
+        const updateButtons = () => {
           playIcon.style.display = state.isPlaying ? "none" : "block";
           pauseIcon.style.display = state.isPlaying ? "block" : "none";
           playButton.classList.toggle("active", state.isPlaying);
           soundOnIcon.style.display = state.audioEnabled ? "block" : "none";
           soundOffIcon.style.display = state.audioEnabled ? "none" : "block";
           soundButton.classList.toggle("active", state.audioEnabled);
-        }
+        };
 
-        function toggleAudio() {
+        const toggleAudio = () => {
           state.audioEnabled = !state.audioEnabled;
           video.muted = !state.audioEnabled;
           updateButtons();
-        }
+        };
 
-        async function playVideo() {
+        const playVideo = async () => {
           try {
             await video.play();
             state.isPlaying = true;
             updateButtons();
           } catch (error) {
+            console.error('影片播放失敗:', error);
+            alert('播放失敗，請檢查瀏覽器權限並重新載入頁面');
             video.muted = true;
             state.audioEnabled = false;
             try {
@@ -331,39 +332,44 @@
               state.isPlaying = true;
               updateButtons();
             } catch (retryError) {
-              console.error('影片播放失敗:', retryError);
+              console.error('重試播放失敗:', retryError);
             }
           }
-        }
+        };
 
-        function pauseVideo() {
+        const pauseVideo = () => {
           video.pause();
           state.isPlaying = false;
           updateButtons();
-        }
+        };
 
-        function togglePlayPause() {
-          if (!state.hasPlayed) return;
+        const togglePlayPause = () => {
           if (state.isPlaying) {
             pauseVideo();
           } else {
             playVideo();
           }
-        }
+        };
 
-        function updateProgress() {
+        const updateProgress = () => {
           if (video && video.duration) {
             progressBar.style.width = `${(video.currentTime / video.duration) * 100}%`;
           }
-        }
+        };
+
+        const seekVideo = (e) => {
+          const rect = progressContainer.getBoundingClientRect();
+          const percent = (e.clientX - rect.left) / rect.width;
+          video.currentTime = percent * video.duration;
+        };
 
         playButton.addEventListener("click", togglePlayPause);
         soundButton.addEventListener("click", toggleAudio);
         video.addEventListener("timeupdate", updateProgress);
+        progressContainer.addEventListener("click", seekVideo);
 
         targetEl.addEventListener("targetFound", () => {
           state.targetFound = true;
-          state.hasPlayed = true;
           video.currentTime = 0;
           playVideo();
           scanningOverlay.classList.add("hidden");
