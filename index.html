@@ -181,7 +181,7 @@
           rotation="0 0 0"
           width="1"
           height="1"
-          chroma-key-material="src: #greenscreen-video; color: 0 1 0; threshold: 0.15; smoothness: 0.1"
+          chroma-key-material="src: #greenscreen-video; color: 0.1 0.9 0.2; threshold: 0.3; smoothness: 0.2"
         ></a-plane>
       </a-entity>
     </a-scene>
@@ -202,8 +202,8 @@
           schema: {
             src: { type: 'selector' },
             color: { type: 'vec3', default: {x: 0.0, y: 1.0, z: 0.0} },
-            threshold: { type: 'number', default: 0.15 },
-            smoothness: { type: 'number', default: 0.1 }
+            threshold: { type: 'number', default: 0.5 },
+            smoothness: { type: 'number', default: 0.05 }
           },
 
           init: function () {
@@ -225,7 +225,7 @@
               }
             `;
 
-            // *** 核心修改：Fragment Shader 採用 YUV 算法，移除 abs 以提升精確度 ***
+            // *** 核心修改：Fragment Shader 採用 YUV 算法，並處理負值 ***
             const fragmentShader = `
               uniform sampler2D u_texture;
               uniform vec3 u_keyColor;
@@ -248,8 +248,8 @@
                 vec3 pixel_yuv = rgb2yuv(texColor);
                 vec3 key_yuv = rgb2yuv(u_keyColor);
                 
-                // 只計算色彩(UV)的距離，忽略亮度(Y)，不使用 abs 以保持符號精確
-                float chroma_dist = distance(pixel_yuv.yz, key_yuv.yz);
+                // 只計算色彩(UV)的距離，忽略亮度(Y)，並處理負值
+                float chroma_dist = distance(abs(pixel_yuv.yz), abs(key_yuv.yz));
                 
                 // 根據色彩距離計算透明度
                 float alpha = smoothstep(u_threshold, u_threshold + u_smoothness, chroma_dist);
