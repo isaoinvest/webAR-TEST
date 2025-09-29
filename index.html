@@ -183,7 +183,7 @@
           rotation="0 0 0"
           width="1"
           height="1"
-          chroma-key-material="src: #greenscreen-video; color: 0.1 0.9 0.2; threshold: 0.7; smoothness: 0.1"
+          chroma-key-material="src: #greenscreen-video; color: 0.1 0.9 0.2; threshold: 0.3; smoothness: 0.2"
         ></a-plane>
       </a-entity>
     </a-scene>
@@ -199,25 +199,24 @@
       }
 
       function initApp() {
-        // 整合優化後的綠幕去背 (Chroma Key) 材質組件
+        // 使用更精確的 YUV 色彩空間去背算法
         AFRAME.registerComponent('chroma-key-material', {
           schema: {
             src: { type: 'selector' },
             color: { type: 'vec3', default: {x: 0.0, y: 1.0, z: 0.0} },
             threshold: { type: 'number', default: 0.5 },
-            smoothness: { type: 'number', default: 0.05 } // 新增：平滑度參數
+            smoothness: { type: 'number', default: 0.05 }
           },
 
           init: function () {
             const videoEl = this.data.src;
             if (!videoEl) return;
 
-            // 修正 #1: 使用 RGBFormat 並設定正確的色彩空間
             const videoTexture = new THREE.VideoTexture(videoEl);
             videoTexture.minFilter = THREE.LinearFilter;
             videoTexture.magFilter = THREE.LinearFilter;
-            videoTexture.format = THREE.RGBFormat; // 使用 RGBFormat
-            videoTexture.encoding = THREE.sRGBEncoding; // 關鍵修正：設定色彩編碼
+            videoTexture.format = THREE.RGBFormat;
+            videoTexture.encoding = THREE.sRGBEncoding;
 
             const vertexShader = `
               varying vec2 vUv;
@@ -227,7 +226,7 @@
               }
             `;
 
-            // 修正 #2: 使用 smoothstep 優化去背邊緣
+            // *** 核心修改：Fragment Shader 採用 YUV 算法 ***
             const fragmentShader = `
               uniform sampler2D u_texture;
               uniform vec3 u_keyColor;
@@ -235,21 +234,31 @@
               uniform float u_smoothness;
               varying vec2 vUv;
 
+              // RGB 轉 YUV 函數
+              vec3 rgb2yuv(vec3 rgb){
+                float y = 0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b;
+                float u = -0.14713 * rgb.r - 0.28886 * rgb.g + 0.436 * rgb.b;
+                float v = 0.615 * rgb.r - 0.51499 * rgb.g - 0.10001 * rgb.b;
+                return vec3(y, u, v);
+              }
+
               void main() {
                 vec3 texColor = texture2D(u_texture, vUv).rgb;
-                float distance = length(texColor - u_keyColor);
                 
-                // 使用 smoothstep 產生平滑的 alpha 過渡
-                float alpha = smoothstep(u_threshold - u_smoothness, u_threshold + u_smoothness, distance);
+                // 將像素顏色和目標綠色轉為 YUV
+                vec3 pixel_yuv = rgb2yuv(texColor);
+                vec3 key_yuv = rgb2yuv(u_keyColor);
                 
-                // 如果 alpha 小於 0.1，則完全丟棄，避免綠色邊緣殘留
-                if (alpha < 0.1) discard;
-
+                // 只計算色彩(UV)的距離，忽略亮度(Y)
+                float chroma_dist = distance(pixel_yuv.yz, key_yuv.yz);
+                
+                // 根據色彩距離計算透明度
+                float alpha = smoothstep(u_threshold, u_threshold + u_smoothness, chroma_dist);
+                
                 gl_FragColor = vec4(texColor, alpha);
               }
             `;
             
-            // 修正 #3: 確保材質屬性完整
             this.material = new THREE.ShaderMaterial({
               uniforms: {
                 u_texture: { value: videoTexture },
@@ -261,7 +270,7 @@
               fragmentShader: fragmentShader,
               transparent: true,
               side: THREE.DoubleSide,
-              depthWrite: false // 關鍵屬性：確保透明物體渲染正確
+              depthWrite: false
             });
 
             const mesh = this.el.getObject3D('mesh');
@@ -275,7 +284,7 @@
           }
         });
 
-        // --- 主程式邏輯 (已簡化) ---
+        // --- 主程式邏輯 (無需修改) ---
         const video = document.querySelector("#greenscreen-video");
         const targetEl = document.querySelector("#target0");
         const scanningOverlay = document.getElementById("scanning-overlay");
