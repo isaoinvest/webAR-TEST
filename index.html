@@ -222,7 +222,7 @@
       }
 
       function initApp() {
-        // 註冊透明影片材質組件 - 使用ShaderMaterial優化性能，並調整透明度
+        // 註冊透明影片材質組件 - 使用ShaderMaterial優化性能，並區分前景/背景透明度
         AFRAME.registerComponent('transparent-video-material', {
           schema: {
             foregroundVideo: {type: 'selector'},
@@ -245,7 +245,7 @@
             alphaTexture.magFilter = THREE.LinearFilter;
             alphaTexture.format = THREE.RGBFormat;
             
-            // 自訂ShaderMaterial - 調整透明度乘數為0.5，讓背景更透明
+            // 自訂ShaderMaterial - 前景保持清晰（alpha > 0.5 時夾到1.0），背景提高透明度（alpha <= 0.5 時 * 0.3）
             const material = new THREE.ShaderMaterial({
               uniforms: {
                 foregroundTexture: { value: fgTexture },
@@ -265,7 +265,17 @@
                 void main() {
                   vec4 fgColor = texture2D(foregroundTexture, vUv);
                   vec3 alphaColor = texture2D(alphaTexture, vUv).rgb;
-                  float alpha = (alphaColor.r + alphaColor.g + alphaColor.b) / 3.0 * 0.2; // 降低乘數以增加透明度
+                  float baseAlpha = (alphaColor.r + alphaColor.g + alphaColor.b) / 3.0;
+                  float alpha = baseAlpha;
+                  
+                  // 前景清晰：如果baseAlpha > 0.5，設為1.0（不透明）
+                  if (baseAlpha > 0.5) {
+                    alpha = 1.0;
+                  } else {
+                    // 背景更透明：低alpha值乘以0.3
+                    alpha = baseAlpha * 0.3;
+                  }
+                  
                   gl_FragColor = vec4(fgColor.rgb, alpha);
                 }
               `,
