@@ -95,28 +95,6 @@
         height: 24px;
         fill: white;
       }
-
-      /* 進度條 */
-      .progress-container {
-        position: fixed;
-        bottom: 80px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 200px;
-        height: 4px;
-        background: rgba(255, 255, 255, 0.3);
-        border-radius: 2px;
-        z-index: 1000;
-        overflow: hidden;
-        cursor: pointer;
-      }
-
-      .progress-bar {
-        height: 100%;
-        background: rgba(255, 255, 255, 0.8);
-        width: 0%;
-        transition: width 0.2s;
-      }
     </style>
   </head>
   <body>
@@ -140,10 +118,6 @@
       </button>
     </div>
 
-    <div class="progress-container" id="progress-container">
-      <div class="progress-bar" id="progress-bar"></div>
-    </div>
-
     <div id="scanning-overlay">
       <div class="scanner-frame">
         <div class="scanner-line"></div>
@@ -164,7 +138,7 @@
       <a-assets>
         <video
           id="greenscreen-video"
-          src="https://pub-ac80c6d0a305452bbe0bdfcec65b6a2c.r2.dev/green%20screen.MP4"
+          src="https://raw.githubusercontent.com/isaoinvest/webAR-TEST/main/green screen2.mp4"
           preload="auto"
           loop
           crossorigin="anonymous"
@@ -296,8 +270,6 @@
         const scanningOverlay = document.getElementById("scanning-overlay");
         const playButton = document.getElementById("play-button");
         const soundButton = document.getElementById("sound-button");
-        const progressContainer = document.getElementById("progress-container");
-        const progressBar = document.getElementById("progress-bar");
         const playIcon = document.getElementById("play-icon");
         const pauseIcon = document.getElementById("pause-icon");
         const soundOnIcon = document.getElementById("sound-on-icon");
@@ -358,22 +330,8 @@
           }
         };
 
-        const updateProgress = () => {
-          if (video && video.duration) {
-            progressBar.style.width = `${(video.currentTime / video.duration) * 100}%`;
-          }
-        };
-
-        const seekVideo = (e) => {
-          const rect = progressContainer.getBoundingClientRect();
-          const percent = (e.clientX - rect.left) / rect.width;
-          video.currentTime = percent * video.duration;
-        };
-
         playButton.addEventListener("click", togglePlayPause);
         soundButton.addEventListener("click", toggleAudio);
-        video.addEventListener("timeupdate", updateProgress);
-        progressContainer.addEventListener("click", seekVideo);
 
         targetEl.addEventListener("targetFound", () => {
           state.targetFound = true;
