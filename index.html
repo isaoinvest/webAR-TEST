@@ -155,20 +155,17 @@
       mindar-image="imageTargetSrc: https://raw.githubusercontent.com/isaoinvest/webAR-TEST/main/targets.mind;
                     warmupTolerance: 5;
                     missTolerance: 10;
-                    filterMinCF: 0.000001; 
-                    filterBeta: 250;
                     uiScanning: #scanning-overlay;"
       color-space="sRGB"
       renderer="colorManagement: true, physicallyCorrectLights"
       vr-mode-ui="enabled: false"
       device-orientation-permission-ui="enabled: false"
-      loading-screen="enabled: true;
-                      dotsColor: #fff; backgroundColor: #000"
+      loading-screen="enabled: true; dotsColor: #fff; backgroundColor: #000"
     >
       <a-assets>
         <video
           id="greenscreen-video"
-          src="https://raw.githubusercontent.com/isaoinvest/webAR-TEST/green screen2.mp4"
+          src="https://raw.githubusercontent.com/isaoinvest/webAR-TEST/main/green screen2.mp4"
           preload="auto"
           loop
           crossorigin="anonymous"
@@ -176,31 +173,22 @@
           webkit-playsinline
           muted
         ></video>
-        </a-assets>
+      </a-assets>
 
-      <a-camera
-        position="0 0 0"
-        look-controls="enabled: false"
-        cursor="fuse: false; rayOrigin: mouse;"
-        raycaster="far: 10000; objects: .clickable"
-      ></a-camera>
+      <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-      <a-entity
-        id="target0"
-        mindar-image-target="targetIndex: 0"
-      >
+      <a-entity id="target0" mindar-image-target="targetIndex: 0">
         <a-plane
-          position="0 0.1 0"
+          position="0 0 0"
           rotation="0 0 0"
           width="1"
           height="1"
-          chroma-key-material="src: #greenscreen-video; color: 0.0 1.0 0.0; threshold: 0.65;"
+          chroma-key-material="src: #greenscreen-video; color: 0.1 0.9 0.2; threshold: 0.7; smoothness: 0.1"
         ></a-plane>
       </a-entity>
     </a-scene>
 
     <script>
-      // 等待 A-Frame 載入
       if (window.AFRAME) {
         initApp();
       } else {
@@ -211,22 +199,25 @@
       }
 
       function initApp() {
-        // 新增: 綠幕去背 (Chroma Key) 材質組件
+        // 整合優化後的綠幕去背 (Chroma Key) 材質組件
         AFRAME.registerComponent('chroma-key-material', {
           schema: {
             src: { type: 'selector' },
-            color: { type: 'vec3', default: {x: 0.0, y: 1.0, z: 0.0} }, // 預設去背顏色為綠色
-            threshold: { type: 'number', default: 0.5 } // 去背的容忍度
+            color: { type: 'vec3', default: {x: 0.0, y: 1.0, z: 0.0} },
+            threshold: { type: 'number', default: 0.5 },
+            smoothness: { type: 'number', default: 0.05 } // 新增：平滑度參數
           },
 
           init: function () {
             const videoEl = this.data.src;
             if (!videoEl) return;
 
+            // 修正 #1: 使用 RGBFormat 並設定正確的色彩空間
             const videoTexture = new THREE.VideoTexture(videoEl);
             videoTexture.minFilter = THREE.LinearFilter;
             videoTexture.magFilter = THREE.LinearFilter;
-            videoTexture.format = THREE.RGBAFormat;
+            videoTexture.format = THREE.RGBFormat; // 使用 RGBFormat
+            videoTexture.encoding = THREE.sRGBEncoding; // 關鍵修正：設定色彩編碼
 
             const vertexShader = `
               varying vec2 vUv;
@@ -236,56 +227,66 @@
               }
             `;
 
+            // 修正 #2: 使用 smoothstep 優化去背邊緣
             const fragmentShader = `
               uniform sampler2D u_texture;
               uniform vec3 u_keyColor;
               uniform float u_threshold;
+              uniform float u_smoothness;
               varying vec2 vUv;
 
               void main() {
                 vec3 texColor = texture2D(u_texture, vUv).rgb;
                 float distance = length(texColor - u_keyColor);
-                if (distance < u_threshold) {
-                  discard;
-                }
-                gl_FragColor = vec4(texColor, 1.0);
+                
+                // 使用 smoothstep 產生平滑的 alpha 過渡
+                float alpha = smoothstep(u_threshold - u_smoothness, u_threshold + u_smoothness, distance);
+                
+                // 如果 alpha 小於 0.1，則完全丟棄，避免綠色邊緣殘留
+                if (alpha < 0.1) discard;
+
+                gl_FragColor = vec4(texColor, alpha);
               }
             `;
-
+            
+            // 修正 #3: 確保材質屬性完整
             this.material = new THREE.ShaderMaterial({
               uniforms: {
                 u_texture: { value: videoTexture },
                 u_keyColor: { value: new THREE.Color(this.data.color.x, this.data.color.y, this.data.color.z) },
-                u_threshold: { value: this.data.threshold }
+                u_threshold: { value: this.data.threshold },
+                u_smoothness: { value: this.data.smoothness }
               },
               vertexShader: vertexShader,
               fragmentShader: fragmentShader,
-              transparent: true
+              transparent: true,
+              side: THREE.DoubleSide,
+              depthWrite: false // 關鍵屬性：確保透明物體渲染正確
             });
 
             const mesh = this.el.getObject3D('mesh');
             if (mesh) {
               mesh.material = this.material;
+            } else {
+              this.el.addEventListener('model-loaded', () => {
+                this.el.getObject3D('mesh').material = this.material;
+              });
             }
           }
         });
 
-        // --- 主程式邏輯簡化 ---
-
-        // 主要元素變數宣告
+        // --- 主程式邏輯 (已簡化) ---
         const video = document.querySelector("#greenscreen-video");
         const targetEl = document.querySelector("#target0");
         const scanningOverlay = document.getElementById("scanning-overlay");
         const playButton = document.getElementById("play-button");
         const soundButton = document.getElementById("sound-button");
         const progressBar = document.getElementById("progress-bar");
-        // 圖標元素
         const playIcon = document.getElementById("play-icon");
         const pauseIcon = document.getElementById("pause-icon");
         const soundOnIcon = document.getElementById("sound-on-icon");
         const soundOffIcon = document.getElementById("sound-off-icon");
 
-        // 狀態管理
         const state = {
           targetFound: false,
           audioEnabled: false,
@@ -293,40 +294,33 @@
           hasPlayed: false
         };
 
-        // 更新按鈕圖標
         function updateButtons() {
           playIcon.style.display = state.isPlaying ? "none" : "block";
           pauseIcon.style.display = state.isPlaying ? "block" : "none";
           playButton.classList.toggle("active", state.isPlaying);
-          
           soundOnIcon.style.display = state.audioEnabled ? "block" : "none";
           soundOffIcon.style.display = state.audioEnabled ? "none" : "block";
           soundButton.classList.toggle("active", state.audioEnabled);
         }
 
-        // 音訊控制
         function toggleAudio() {
           state.audioEnabled = !state.audioEnabled;
           video.muted = !state.audioEnabled;
           updateButtons();
         }
 
-        // 影片播放控制
         async function playVideo() {
           try {
             await video.play();
             state.isPlaying = true;
             updateButtons();
-            console.log('影片開始播放');
           } catch (error) {
-            console.warn('播放失敗，嘗試靜音播放:', error);
             video.muted = true;
             state.audioEnabled = false;
             try {
               await video.play();
               state.isPlaying = true;
               updateButtons();
-              console.log('靜音播放成功');
             } catch (retryError) {
               console.error('影片播放失敗:', retryError);
             }
@@ -339,7 +333,6 @@
           updateButtons();
         }
 
-        // 播放/暫停切換
         function togglePlayPause() {
           if (!state.hasPlayed) return;
           if (state.isPlaying) {
@@ -349,41 +342,30 @@
           }
         }
 
-        // 進度更新
         function updateProgress() {
           if (video && video.duration) {
-            const progress = (video.currentTime / video.duration) * 100;
-            progressBar.style.width = progress + "%";
+            progressBar.style.width = `${(video.currentTime / video.duration) * 100}%`;
           }
         }
 
-        // 按鈕事件
         playButton.addEventListener("click", togglePlayPause);
         soundButton.addEventListener("click", toggleAudio);
-        
-        // 影片進度更新
         video.addEventListener("timeupdate", updateProgress);
 
-        // 目標事件處理
         targetEl.addEventListener("targetFound", () => {
-          console.log('目標找到');
           state.targetFound = true;
           state.hasPlayed = true;
-          
           video.currentTime = 0;
           playVideo();
-          
           scanningOverlay.classList.add("hidden");
         });
 
         targetEl.addEventListener("targetLost", () => {
-          console.log('目標丟失');
           state.targetFound = false;
           pauseVideo();
           scanningOverlay.classList.remove("hidden");
         });
 
-        // 頁面可見性處理
         document.addEventListener("visibilitychange", () => {
           if (document.hidden) {
             pauseVideo();
@@ -392,7 +374,6 @@
           }
         });
 
-        // 初始化
         updateButtons();
         console.log('應用初始化完成');
       }
