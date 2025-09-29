@@ -166,19 +166,8 @@
     >
       <a-assets>
         <video
-          id="foreground-video"
-          src="https://pub-ac80c6d0a305452bbe0bdfcec65b6a2c.r2.dev/foreground.mp4"
-          preload="auto"
-          loop
-          crossorigin="anonymous"
-          playsinline
-          webkit-playsinline
-          muted
-        ></video>
-        
-        <video
-          id="alpha-video-asset"
-          src="https://pub-ac80c6d0a305452bbe0bdfcec65b6a2c.r2.dev/alpha.mp4"
+          id="greenscreen-video"
+          src="https://pub-ac80c6d0a305452bbe0bdfcec65b6a2c.r2.dev/213926.mp4"
           preload="auto"
           loop
           crossorigin="anonymous"
@@ -222,34 +211,26 @@
       }
 
       function initApp() {
-        // 註冊透明影片材質組件 - 使用ShaderMaterial優化性能，並區分前景/背景透明度
-        AFRAME.registerComponent('transparent-video-material', {
+        // 註冊綠幕去除材質組件 - 使用ShaderMaterial進行chroma keying
+        AFRAME.registerComponent('greenscreen-material', {
           schema: {
-            foregroundVideo: {type: 'selector'},
-            alphaVideo: {type: 'selector'}
+            video: {type: 'selector'}
           },
           
           init: function() {
-            const fgVideo = this.data.foregroundVideo;
-            const alphaVideo = this.data.alphaVideo;
-            if (!fgVideo || !alphaVideo) return;
+            const video = this.data.video;
+            if (!video) return;
             
             // 創建VideoTexture
-            const fgTexture = new THREE.VideoTexture(fgVideo);
-            fgTexture.minFilter = THREE.LinearFilter;
-            fgTexture.magFilter = THREE.LinearFilter;
-            fgTexture.format = THREE.RGBFormat;
+            const texture = new THREE.VideoTexture(video);
+            texture.minFilter = THREE.LinearFilter;
+            texture.magFilter = THREE.LinearFilter;
+            texture.format = THREE.RGBFormat;
             
-            const alphaTexture = new THREE.VideoTexture(alphaVideo);
-            alphaTexture.minFilter = THREE.LinearFilter;
-            alphaTexture.magFilter = THREE.LinearFilter;
-            alphaTexture.format = THREE.RGBFormat;
-            
-            // 自訂ShaderMaterial - 前景保持清晰（alpha > 0.5 時夾到1.0），背景提高透明度（alpha <= 0.5 時 * 0.3）
+            // 自訂ShaderMaterial - 綠幕chroma keying
             const material = new THREE.ShaderMaterial({
               uniforms: {
-                foregroundTexture: { value: fgTexture },
-                alphaTexture: { value: alphaTexture }
+                videoTexture: { value: texture }
               },
               vertexShader: `
                 varying vec2 vUv;
@@ -259,24 +240,19 @@
                 }
               `,
               fragmentShader: `
-                uniform sampler2D foregroundTexture;
-                uniform sampler2D alphaTexture;
+                uniform sampler2D videoTexture;
                 varying vec2 vUv;
                 void main() {
-                  vec4 fgColor = texture2D(foregroundTexture, vUv);
-                  vec3 alphaColor = texture2D(alphaTexture, vUv).rgb;
-                  float baseAlpha = (alphaColor.r + alphaColor.g + alphaColor.b) / 3.0;
-                  float alpha = baseAlpha;
+                  vec3 color = texture2D(videoTexture, vUv).rgb;
+                  vec3 green = vec3(0.0, 1.0, 0.0);
                   
-                  // 前景清晰：如果baseAlpha > 0.5，設為1.0（不透明）
-                  if (baseAlpha > 0.5) {
-                    alpha = 1.0;
-                  } else {
-                    // 背景更透明：低alpha值乘以0.3
-                    alpha = baseAlpha * 0.3;
-                  }
+                  // 計算顏色與綠色的距離（簡單的RGB差異）
+                  float dist = length(color - green);
                   
-                  gl_FragColor = vec4(fgColor.rgb, alpha);
+                  // 閾值：如果距離小於0.3，視為綠幕並設為透明
+                  float alpha = (dist < 0.3) ? 0.0 : 1.0;
+                  
+                  gl_FragColor = vec4(color, alpha);
                 }
               `,
               transparent: true,
@@ -290,14 +266,12 @@
             
             // 保存參考
             this.material = material;
-            this.fgTexture = fgTexture;
-            this.alphaTexture = alphaTexture;
+            this.texture = texture;
           }
         });
 
         // 主要元素變數宣告
-        const foregroundVideo = document.querySelector("#foreground-video");
-        const alphaVideo = document.querySelector("#alpha-video-asset");
+        const greenscreenVideo = document.querySelector("#greenscreen-video");
         const targetEl = document.querySelector("#target0");
         const scanningOverlay = document.getElementById("scanning-overlay");
         const playButton = document.getElementById("play-button");
@@ -314,9 +288,8 @@
         function initVideoMaterial() {
           const videoEntity = document.querySelector("#video0-entity");
           if (videoEntity) {
-            videoEntity.setAttribute("transparent-video-material", {
-              foregroundVideo: "#foreground-video",
-              alphaVideo: "#alpha-video-asset"
+            videoEntity.setAttribute("greenscreen-material", {
+              video: "#greenscreen-video"
             });
           }
         }
@@ -350,36 +323,27 @@
         // 音訊控制
         function toggleAudio() {
           state.audioEnabled = !state.audioEnabled;
-          foregroundVideo.muted = !state.audioEnabled;
-          alphaVideo.muted = true; // alpha影片始終靜音
+          greenscreenVideo.muted = !state.audioEnabled;
           updateButtons();
         }
 
         // 影片播放控制
         async function playVideos() {
           try {
-            // 確保影片同步
-            const targetTime = foregroundVideo.currentTime;
-            alphaVideo.currentTime = targetTime;
+            const playPromise = greenscreenVideo.play();
             
-            const playPromises = [
-              foregroundVideo.play(),
-              alphaVideo.play()
-            ];
-            
-            await Promise.all(playPromises);
+            await playPromise;
             state.isPlaying = true;
             
             updateButtons();
             console.log('影片開始播放');
           } catch (error) {
             console.warn('播放失敗，嘗試靜音播放:', error);
-            foregroundVideo.muted = true;
-            alphaVideo.muted = true;
+            greenscreenVideo.muted = true;
             state.audioEnabled = false;
             
             try {
-              await Promise.all([foregroundVideo.play(), alphaVideo.play()]);
+              await greenscreenVideo.play();
               state.isPlaying = true;
               updateButtons();
               console.log('靜音播放成功');
@@ -390,8 +354,7 @@
         }
 
         function pauseVideos() {
-          foregroundVideo.pause();
-          alphaVideo.pause();
+          greenscreenVideo.pause();
           state.isPlaying = false;
           updateButtons();
         }
@@ -409,8 +372,8 @@
 
         // 進度更新
         function updateProgress() {
-          if (foregroundVideo && foregroundVideo.duration) {
-            const progress = (foregroundVideo.currentTime / foregroundVideo.duration) * 100;
+          if (greenscreenVideo && greenscreenVideo.duration) {
+            const progress = (greenscreenVideo.currentTime / greenscreenVideo.duration) * 100;
             progressBar.style.width = progress + "%";
           }
         }
@@ -420,18 +383,7 @@
         soundButton.addEventListener("click", toggleAudio);
         
         // 影片進度更新
-        foregroundVideo.addEventListener("timeupdate", updateProgress);
-
-        // 同步兩個影片的播放時間
-        let syncTimer = null;
-        foregroundVideo.addEventListener("timeupdate", () => {
-          if (syncTimer) clearTimeout(syncTimer);
-          syncTimer = setTimeout(() => {
-            if (Math.abs(foregroundVideo.currentTime - alphaVideo.currentTime) > 0.1) {
-              alphaVideo.currentTime = foregroundVideo.currentTime;
-            }
-          }, 100);
-        });
+        greenscreenVideo.addEventListener("timeupdate", updateProgress);
 
         // 目標事件處理
         targetEl.addEventListener("targetFound", () => {
@@ -444,8 +396,7 @@
             initVideoMaterial();
             
             // 重置並播放影片
-            foregroundVideo.currentTime = 0;
-            alphaVideo.currentTime = 0;
+            greenscreenVideo.currentTime = 0;
             playVideos();
           }, 100);
           
