@@ -139,11 +139,11 @@
 
     <a-scene
       mindar-image="imageTargetSrc: https://raw.githubusercontent.com/isaoinvest/webAR-TEST/main/targets.mind;
-                    warmupTolerance: 5;
-                    missTolerance: 10;
+                    warmupTolerance: 3;
+                    missTolerance: 5;
                     uiScanning: #scanning-overlay;"
       color-space="sRGB"
-      renderer="colorManagement: true, physicallyCorrectLights"
+      renderer="antialias: false; sortObjects: false; colorManagement: true, physicallyCorrectLights"
       vr-mode-ui="enabled: false"
       device-orientation-permission-ui="enabled: false"
       loading-screen="enabled: true; dotsColor: #fff; backgroundColor: #000; wording: 載入中...;"
@@ -251,9 +251,16 @@
           init: function () {
             const videoEl = this.data.src;
             if (!videoEl) {
-              console.error('找不到視頻元素');
               return;
             }
+
+            let rafId = null;
+            const updateTexture = () => {
+              if (this.material && this.material.uniforms.u_texture.value) {
+                this.material.uniforms.u_texture.value.needsUpdate = true;
+              }
+              rafId = requestAnimationFrame(updateTexture);
+            };
 
             // 等待視頻元數據載入
             const initMaterial = () => {
@@ -361,9 +368,20 @@
                   });
                 }
 
-                console.log('Chroma key material 初始化完成');
+                // 啟動 RAF 更新，每30ms更新一次 (約33fps)
+                const throttledUpdate = () => {
+                  if (rafId) cancelAnimationFrame(rafId);
+                  rafId = requestAnimationFrame(() => {
+                    if (this.material && this.material.uniforms.u_texture.value) {
+                      this.material.uniforms.u_texture.value.needsUpdate = true;
+                    }
+                    setTimeout(() => {
+                      rafId = requestAnimationFrame(throttledUpdate);
+                    }, 30);
+                  });
+                };
+                throttledUpdate();
               } catch (error) {
-                console.error('Material 初始化錯誤:', error);
                 showError('視頻材質初始化失敗');
               }
             };
@@ -376,6 +394,12 @@
               videoEl.addEventListener('canplay', () => {
                 if (!this.material) initMaterial();
               }, { once: true });
+            }
+          },
+
+          remove: function () {
+            if (this.rafId) {
+              cancelAnimationFrame(this.rafId);
             }
           }
         });
@@ -398,8 +422,20 @@
         const state = {
           anyTargetFound: false,
           audioEnabled: false,
-          videoStates: {}  // 每個視頻的狀態: { playing: false, hasInteracted: false }
+          videoStates: {},  // 每個視頻的狀態: { playing: false, hasInteracted: false }
+          hiddenTimer: null,
+          hiddenStart: null
         };
+
+        // 裝置適配：低階裝置調整平面大小
+        const isLowEndDevice = navigator.hardwareConcurrency < 4 || navigator.deviceMemory < 4;
+        const planeSize = isLowEndDevice ? 0.8 : 1.0;
+
+        // 動態調整所有平面的尺寸
+        document.querySelectorAll('a-plane').forEach(plane => {
+          plane.setAttribute('width', planeSize);
+          plane.setAttribute('height', planeSize);
+        });
 
         // 初始化每個視頻的狀態
         videos.forEach(v => {
@@ -408,7 +444,6 @@
           if (video) {
             // 視頻錯誤處理
             video.addEventListener('error', (e) => {
-              console.error(`視頻 ${v.id} 載入錯誤:`, e);
               const error = video.error;
               let errorMsg = `視頻 ${v.id} 載入失敗`;
               if (error) {
@@ -423,9 +458,7 @@
             });
 
             // 視頻載入完成
-            video.addEventListener('loadeddata', () => {
-              console.log(`視頻 ${v.id} 載入完成，格式:`, video.videoWidth + 'x' + video.videoHeight);
-            });
+            video.addEventListener('loadeddata', () => {});
           }
         });
 
@@ -459,8 +492,7 @@
             const videoState = state.videoStates[v.id];
             if (video) {
               if (anyPlaying) {
-                video.pause();
-                videoState.playing = false;
+                pauseVideo(video, videoState, v.id);
               } else {
                 playVideo(video, videoState, v.id);
               }
@@ -476,9 +508,7 @@
           try {
             await video.play();
             videoState.playing = true;
-            console.log(`視頻 ${videoId} 播放中`);
           } catch (error) {
-            console.error(`視頻 ${videoId} 播放失敗:`, error);
             showError(`播放 ${videoId} 失敗，請檢查瀏覽器權限`);
           }
         };
@@ -486,7 +516,9 @@
         const pauseVideo = (video, videoState, videoId) => {
           video.pause();
           videoState.playing = false;
-          console.log(`視頻 ${videoId} 已暫停`);
+          // 釋放資源以節省記憶體
+          video.src = '';
+          video.load();
         };
 
         // 為每個 target 設置事件
@@ -498,10 +530,20 @@
 
           if (targetEl && video) {
             targetEl.addEventListener("targetFound", () => {
-              console.log(`${v.targetId} 目標識別成功`);
               state.anyTargetFound = true;
               video.currentTime = 0;
               scanningOverlay.classList.add("hidden");
+
+              // 暫停其他影片，限制同時播放
+              videos.forEach(v2 => {
+                if (v2.id !== v.id) {
+                  const otherVideo = document.getElementById(v2.id);
+                  const otherState = state.videoStates[v2.id];
+                  if (otherVideo && otherState.playing) {
+                    pauseVideo(otherVideo, otherState, v2.id);
+                  }
+                }
+              });
 
               // 自動播放 (靜音)
               if (!videoState.hasInteracted) {
@@ -511,7 +553,6 @@
             });
 
             targetEl.addEventListener("targetLost", () => {
-              console.log(`${v.targetId} 目標丟失`);
               pauseVideo(video, videoState, v.id);
               // 只在所有 target 都丟失時顯示 overlay
               const allLost = videos.every(v2 => {
@@ -528,14 +569,12 @@
           // 點擊視頻平面來 toggle 播放/暫停 和 unmute
           if (videoPlane) {
             videoPlane.addEventListener("click", (event) => {
-              console.log(`點擊 ${v.id} 平面`);
               event.stopPropagation();
               event.preventDefault();
 
               if (!videoState.hasInteracted) {
                 video.muted = false;  // unmute
                 videoState.hasInteracted = true;
-                console.log(`視頻 ${v.id} 取消靜音`);
               }
 
               if (!videoState.playing) {
@@ -550,6 +589,20 @@
 
         document.addEventListener("visibilitychange", () => {
           if (document.hidden) {
+            state.hiddenStart = Date.now();
+            state.hiddenTimer = setTimeout(() => {
+              if (document.hidden && (Date.now() - state.hiddenStart > 5000)) {
+                videos.forEach(v => {
+                  const video = document.getElementById(v.id);
+                  const videoState = state.videoStates[v.id];
+                  if (video && videoState.playing) {
+                    video.currentTime = 0;
+                    pauseVideo(video, videoState, v.id);
+                  }
+                });
+              }
+            }, 5000);
+            // 立即暫停
             videos.forEach(v => {
               const video = document.getElementById(v.id);
               const videoState = state.videoStates[v.id];
@@ -557,13 +610,17 @@
                 pauseVideo(video, videoState, v.id);
               }
             });
-          } else if (state.anyTargetFound) {
+          } else {
+            if (state.hiddenTimer) {
+              clearTimeout(state.hiddenTimer);
+              state.hiddenTimer = null;
+              state.hiddenStart = null;
+            }
             // 恢復播放邏輯依賴 targetFound
           }
         });
 
         updateButtons();
-        console.log('多視頻 AR 應用初始化完成');
       }
     </script>
   </body>
