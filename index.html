@@ -4,7 +4,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <link rel="preconnect" href="https://aframe.io" />
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.2/dist/mindar-image-aframe.prod.js"></script>
 
@@ -55,6 +54,63 @@
         50% { transform: translateY(176px); }
       }
 
+      /* 調試控制面板 */
+      .debug-panel {
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        background: rgba(0, 0, 0, 0.85);
+        color: white;
+        padding: 15px;
+        border-radius: 10px;
+        z-index: 1001;
+        font-size: 12px;
+        max-width: 250px;
+        max-height: 90vh;
+        overflow-y: auto;
+      }
+
+      .debug-panel h3 {
+        margin: 0 0 10px 0;
+        font-size: 14px;
+        border-bottom: 1px solid rgba(255,255,255,0.3);
+        padding-bottom: 5px;
+      }
+
+      .control-group {
+        margin-bottom: 15px;
+      }
+
+      .control-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-size: 11px;
+      }
+
+      .control-group input[type="range"] {
+        width: 100%;
+      }
+
+      .control-group .value-display {
+        color: #4CAF50;
+        font-weight: bold;
+      }
+
+      .control-group button {
+        background: #4CAF50;
+        color: white;
+        border: none;
+        padding: 8px 12px;
+        border-radius: 5px;
+        cursor: pointer;
+        margin-right: 5px;
+        font-size: 11px;
+      }
+
+      .control-group button:hover {
+        background: #45a049;
+      }
+
       .controls-container {
         position: fixed;
         bottom: 20px;
@@ -94,22 +150,58 @@
         fill: white;
       }
 
-      #error-message {
+      #toggle-debug {
         position: fixed;
-        top: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        background-color: rgba(255, 0, 0, 0.8);
+        top: 10px;
+        left: 10px;
+        background: rgba(0, 0, 0, 0.6);
         color: white;
-        padding: 10px 20px;
-        border-radius: 5px;
-        z-index: 2000;
-        display: none;
+        border: 2px solid rgba(255, 255, 255, 0.5);
+        padding: 10px 15px;
+        border-radius: 20px;
+        cursor: pointer;
+        z-index: 1002;
+        font-size: 12px;
       }
     </style>
   </head>
   <body>
-    <div id="error-message"></div>
+    <button id="toggle-debug">🔧 調試面板</button>
+
+    <div class="debug-panel" id="debugPanel" style="display: none;">
+      <h3>綠幕參數調整</h3>
+      
+      <div class="control-group">
+        <label>相似度 (Similarity): <span class="value-display" id="sim-val">0.4</span></label>
+        <input type="range" id="similarity" min="0" max="1" step="0.05" value="0.4">
+      </div>
+
+      <div class="control-group">
+        <label>平滑度 (Smoothness): <span class="value-display" id="smooth-val">0.2</span></label>
+        <input type="range" id="smoothness" min="0.01" max="0.5" step="0.01" value="0.2">
+      </div>
+
+      <div class="control-group">
+        <label>溢出控制 (Spill): <span class="value-display" id="spill-val">0.5</span></label>
+        <input type="range" id="spill" min="0" max="1" step="0.05" value="0.5">
+      </div>
+
+      <div class="control-group">
+        <label>綠色強度 (G): <span class="value-display" id="green-val">1.0</span></label>
+        <input type="range" id="green" min="0" max="1" step="0.05" value="1.0">
+      </div>
+
+      <div class="control-group">
+        <button id="reset-params">重置預設值</button>
+        <button id="print-params">輸出參數</button>
+      </div>
+
+      <div class="control-group">
+        <label style="font-size: 10px; opacity: 0.7;">
+          調整參數直到背景透明，前景清晰為止
+        </label>
+      </div>
+    </div>
 
     <div class="controls-container">
       <button class="icon-button" id="play-button" aria-label="播放/暫停">
@@ -146,7 +238,6 @@
       renderer="colorManagement: true, physicallyCorrectLights"
       vr-mode-ui="enabled: false"
       device-orientation-permission-ui="enabled: false"
-      loading-screen="enabled: true; dotsColor: #fff; backgroundColor: #000; wording: 載入中...;"
     >
       <a-assets>
         <video
@@ -169,7 +260,8 @@
           rotation="0 0 0"
           width="1"
           height="1"
-          chroma-key-material="src: #greenscreen-video; color: 0 1 0; similarity: 0.2; smoothness: 0.03; spill: 0.4"
+          id="video-plane"
+          chroma-key-material="src: #greenscreen-video"
         ></a-plane>
       </a-entity>
     </a-scene>
@@ -185,159 +277,159 @@
       }
 
       function initApp() {
-        // 錯誤訊息顯示
-        const showError = (message) => {
-          const errorEl = document.getElementById('error-message');
-          errorEl.textContent = message;
-          errorEl.style.display = 'block';
-          setTimeout(() => {
-            errorEl.style.display = 'none';
-          }, 5000);
-        };
+        let chromaMaterial = null;
 
-        // 改進的 Chroma Key Material - 支援多種影片格式
+        // 可調整的 Chroma Key Material
         AFRAME.registerComponent('chroma-key-material', {
           schema: {
-            src: { type: 'selector' },
-            color: { type: 'vec3', default: {x: 0.0, y: 1.0, z: 0.0} },
-            similarity: { type: 'number', default: 0.2 },
-            smoothness: { type: 'number', default: 0.03 },
-            spill: { type: 'number', default: 0.4 }
+            src: { type: 'selector' }
           },
 
           init: function () {
             const videoEl = this.data.src;
-            if (!videoEl) {
-              console.error('找不到視頻元素');
-              return;
-            }
+            if (!videoEl) return;
 
-            // 等待視頻元數據載入
             const initMaterial = () => {
-              try {
-                const videoTexture = new THREE.VideoTexture(videoEl);
-                videoTexture.minFilter = THREE.LinearFilter;
-                videoTexture.magFilter = THREE.LinearFilter;
-                
-                // 支援多種色彩格式
-                if (THREE.RGBAFormat) {
-                  videoTexture.format = THREE.RGBAFormat;
-                } else {
-                  videoTexture.format = THREE.RGBFormat;
-                }
-                
-                // 根據 Three.js 版本使用正確的編碼屬性
-                if (videoTexture.colorSpace !== undefined) {
-                  videoTexture.colorSpace = THREE.SRGBColorSpace || 'srgb';
-                } else if (videoTexture.encoding !== undefined) {
-                  videoTexture.encoding = THREE.sRGBEncoding || 3001;
-                }
-                
-                videoTexture.generateMipmaps = false;
-                videoTexture.needsUpdate = true;
-
-                const vertexShader = `
-                  varying vec2 vUv;
-                  void main() {
-                    vUv = uv;
-                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                  }
-                `;
-
-                // 改進的 Fragment Shader - 更好的綠幕去除
-                const fragmentShader = `
-                  uniform sampler2D u_texture;
-                  uniform vec3 u_keyColor;
-                  uniform float u_similarity;
-                  uniform float u_smoothness;
-                  uniform float u_spill;
-                  varying vec2 vUv;
-
-                  // RGB 轉 YUV 色彩空間
-                  vec3 rgb2yuv(vec3 rgb) {
-                    float y = 0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b;
-                    float u = (rgb.b - y) * 0.565;
-                    float v = (rgb.r - y) * 0.713;
-                    return vec3(y, u, v);
-                  }
-
-                  void main() {
-                    vec4 rgba = texture2D(u_texture, vUv);
-                    vec3 texColor = rgba.rgb;
-                    
-                    // 轉換為 YUV 以更好處理色度
-                    vec3 yuvColor = rgb2yuv(texColor);
-                    vec3 yuvKey = rgb2yuv(u_keyColor);
-                    
-                    // 計算色度距離（只比較 UV，忽略亮度）
-                    float chromaDist = distance(yuvColor.yz, yuvKey.yz);
-                    
-                    // 計算 alpha mask
-                    float baseMask = chromaDist - u_similarity;
-                    float fullMask = pow(clamp(baseMask / u_smoothness, 0.0, 1.0), 1.5);
-                    float alpha = fullMask;
-                    
-                    // Spill suppression - 移除綠色溢出
-                    float spillVal = pow(clamp(baseMask / u_spill, 0.0, 1.0), 1.5);
-                    float desat = yuvColor.x; // 使用亮度值
-                    vec3 suppressedColor = mix(vec3(desat), texColor, spillVal);
-                    
-                    // 邊緣柔化
-                    alpha = smoothstep(0.0, 0.1, alpha);
-                    
-                    gl_FragColor = vec4(suppressedColor, alpha);
-                  }
-                `;
-                
-                this.material = new THREE.ShaderMaterial({
-                  uniforms: {
-                    u_texture: { value: videoTexture },
-                    u_keyColor: { value: new THREE.Color(this.data.color.x, this.data.color.y, this.data.color.z) },
-                    u_similarity: { value: this.data.similarity },
-                    u_smoothness: { value: this.data.smoothness },
-                    u_spill: { value: this.data.spill }
-                  },
-                  vertexShader: vertexShader,
-                  fragmentShader: fragmentShader,
-                  transparent: true,
-                  side: THREE.DoubleSide,
-                  depthWrite: false,
-                  depthTest: true,
-                  blending: THREE.NormalBlending
-                });
-
-                const mesh = this.el.getObject3D('mesh');
-                if (mesh) {
-                  mesh.material = this.material;
-                } else {
-                  this.el.addEventListener('model-loaded', () => {
-                    const loadedMesh = this.el.getObject3D('mesh');
-                    if (loadedMesh) {
-                      loadedMesh.material = this.material;
-                    }
-                  });
-                }
-
-                console.log('Chroma key material 初始化完成');
-              } catch (error) {
-                console.error('Material 初始化錯誤:', error);
-                showError('視頻材質初始化失敗');
+              const videoTexture = new THREE.VideoTexture(videoEl);
+              videoTexture.minFilter = THREE.LinearFilter;
+              videoTexture.magFilter = THREE.LinearFilter;
+              videoTexture.format = THREE.RGBAFormat || THREE.RGBFormat;
+              
+              if (videoTexture.colorSpace !== undefined) {
+                videoTexture.colorSpace = THREE.SRGBColorSpace || 'srgb';
+              } else if (videoTexture.encoding !== undefined) {
+                videoTexture.encoding = THREE.sRGBEncoding || 3001;
               }
+              
+              videoTexture.generateMipmaps = false;
+
+              const vertexShader = `
+                varying vec2 vUv;
+                void main() {
+                  vUv = uv;
+                  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+              `;
+
+              const fragmentShader = `
+                uniform sampler2D u_texture;
+                uniform vec3 u_keyColor;
+                uniform float u_similarity;
+                uniform float u_smoothness;
+                uniform float u_spill;
+                varying vec2 vUv;
+
+                void main() {
+                  vec4 texColor = texture2D(u_texture, vUv);
+                  
+                  // 計算與綠色的距離
+                  vec3 diff = texColor.rgb - u_keyColor;
+                  float dist = length(diff);
+                  
+                  // 計算 alpha
+                  float alpha = smoothstep(u_similarity, u_similarity + u_smoothness, dist);
+                  
+                  // Spill suppression - 移除綠色邊緣
+                  vec3 finalColor = texColor.rgb;
+                  if (alpha > 0.05 && alpha < 0.95) {
+                    float greenness = texColor.g - max(texColor.r, texColor.b);
+                    if (greenness > 0.0) {
+                      float spillAmount = (1.0 - alpha) * u_spill;
+                      finalColor.g = mix(texColor.g, max(texColor.r, texColor.b), spillAmount);
+                    }
+                  }
+                  
+                  gl_FragColor = vec4(finalColor, alpha);
+                }
+              `;
+              
+              chromaMaterial = new THREE.ShaderMaterial({
+                uniforms: {
+                  u_texture: { value: videoTexture },
+                  u_keyColor: { value: new THREE.Color(0.0, 1.0, 0.0) },
+                  u_similarity: { value: 0.4 },
+                  u_smoothness: { value: 0.2 },
+                  u_spill: { value: 0.5 }
+                },
+                vertexShader: vertexShader,
+                fragmentShader: fragmentShader,
+                transparent: true,
+                side: THREE.DoubleSide,
+                depthWrite: false
+              });
+
+              const mesh = this.el.getObject3D('mesh');
+              if (mesh) {
+                mesh.material = chromaMaterial;
+              }
+
+              console.log('✅ Chroma key material 初始化完成');
             };
 
-            // 等待視頻準備好
             if (videoEl.readyState >= 2) {
               initMaterial();
             } else {
               videoEl.addEventListener('loadedmetadata', initMaterial, { once: true });
-              videoEl.addEventListener('canplay', () => {
-                if (!this.material) initMaterial();
-              }, { once: true });
             }
           }
         });
 
-        // 主程式邏輯
+        // 調試面板控制
+        const debugPanel = document.getElementById('debugPanel');
+        const toggleDebug = document.getElementById('toggle-debug');
+        
+        toggleDebug.addEventListener('click', () => {
+          debugPanel.style.display = debugPanel.style.display === 'none' ? 'block' : 'none';
+        });
+
+        // 參數控制
+        const similarityInput = document.getElementById('similarity');
+        const smoothnessInput = document.getElementById('smoothness');
+        const spillInput = document.getElementById('spill');
+        const greenInput = document.getElementById('green');
+
+        const updateChromaKey = () => {
+          if (!chromaMaterial) return;
+
+          const similarity = parseFloat(similarityInput.value);
+          const smoothness = parseFloat(smoothnessInput.value);
+          const spill = parseFloat(spillInput.value);
+          const green = parseFloat(greenInput.value);
+
+          chromaMaterial.uniforms.u_similarity.value = similarity;
+          chromaMaterial.uniforms.u_smoothness.value = smoothness;
+          chromaMaterial.uniforms.u_spill.value = spill;
+          chromaMaterial.uniforms.u_keyColor.value = new THREE.Color(0.0, green, 0.0);
+
+          document.getElementById('sim-val').textContent = similarity.toFixed(2);
+          document.getElementById('smooth-val').textContent = smoothness.toFixed(2);
+          document.getElementById('spill-val').textContent = spill.toFixed(2);
+          document.getElementById('green-val').textContent = green.toFixed(2);
+        };
+
+        similarityInput.addEventListener('input', updateChromaKey);
+        smoothnessInput.addEventListener('input', updateChromaKey);
+        spillInput.addEventListener('input', updateChromaKey);
+        greenInput.addEventListener('input', updateChromaKey);
+
+        document.getElementById('reset-params').addEventListener('click', () => {
+          similarityInput.value = 0.4;
+          smoothnessInput.value = 0.2;
+          spillInput.value = 0.5;
+          greenInput.value = 1.0;
+          updateChromaKey();
+        });
+
+        document.getElementById('print-params').addEventListener('click', () => {
+          console.log('=== 當前參數 ===');
+          console.log('similarity:', similarityInput.value);
+          console.log('smoothness:', smoothnessInput.value);
+          console.log('spill:', spillInput.value);
+          console.log('green:', greenInput.value);
+          alert('參數已輸出到控制台 (按 F12 查看)');
+        });
+
+        // 視頻控制
         const video = document.querySelector("#greenscreen-video");
         const targetEl = document.querySelector("#target0");
         const scanningOverlay = document.getElementById("scanning-overlay");
@@ -351,31 +443,8 @@
         const state = {
           targetFound: false,
           audioEnabled: false,
-          isPlaying: false,
-          videoReady: false
+          isPlaying: false
         };
-
-        // 視頻錯誤處理
-        video.addEventListener('error', (e) => {
-          console.error('視頻載入錯誤:', e);
-          const error = video.error;
-          let errorMsg = '視頻載入失敗';
-          if (error) {
-            switch (error.code) {
-              case 1: errorMsg = '視頻載入被中止'; break;
-              case 2: errorMsg = '網絡錯誤'; break;
-              case 3: errorMsg = '視頻解碼失敗 - 格式可能不支援'; break;
-              case 4: errorMsg = '視頻格式不支援'; break;
-            }
-          }
-          showError(errorMsg);
-        });
-
-        // 視頻載入完成
-        video.addEventListener('loadeddata', () => {
-          state.videoReady = true;
-          console.log('視頻載入完成，格式:', video.videoWidth + 'x' + video.videoHeight);
-        });
 
         const updateButtons = () => {
           playIcon.style.display = state.isPlaying ? "none" : "block";
@@ -393,34 +462,20 @@
         };
 
         const playVideo = async () => {
-          if (!state.videoReady) {
-            console.log('視頻尚未準備好');
-            return;
-          }
-
           try {
             await video.play();
             state.isPlaying = true;
             updateButtons();
           } catch (error) {
-            console.error('影片播放失敗:', error);
-            
-            // 嘗試靜音播放
-            if (!video.muted) {
-              console.log('嘗試靜音播放...');
-              video.muted = true;
-              state.audioEnabled = false;
-              try {
-                await video.play();
-                state.isPlaying = true;
-                updateButtons();
-                showError('已自動切換為靜音播放');
-              } catch (retryError) {
-                console.error('重試播放失敗:', retryError);
-                showError('播放失敗，請檢查瀏覽器權限');
-              }
-            } else {
-              showError('播放失敗，請重新載入頁面');
+            console.error('播放失敗:', error);
+            video.muted = true;
+            state.audioEnabled = false;
+            try {
+              await video.play();
+              state.isPlaying = true;
+              updateButtons();
+            } catch (e) {
+              console.error('重試失敗:', e);
             }
           }
         };
@@ -431,19 +486,13 @@
           updateButtons();
         };
 
-        const togglePlayPause = () => {
-          if (state.isPlaying) {
-            pauseVideo();
-          } else {
-            playVideo();
-          }
-        };
-
-        playButton.addEventListener("click", togglePlayPause);
+        playButton.addEventListener("click", () => {
+          state.isPlaying ? pauseVideo() : playVideo();
+        });
+        
         soundButton.addEventListener("click", toggleAudio);
 
         targetEl.addEventListener("targetFound", () => {
-          console.log('目標識別成功');
           state.targetFound = true;
           video.currentTime = 0;
           playVideo();
@@ -451,22 +500,13 @@
         });
 
         targetEl.addEventListener("targetLost", () => {
-          console.log('目標丟失');
           state.targetFound = false;
           pauseVideo();
           scanningOverlay.classList.remove("hidden");
         });
 
-        document.addEventListener("visibilitychange", () => {
-          if (document.hidden) {
-            pauseVideo();
-          } else if (state.targetFound) {
-            playVideo();
-          }
-        });
-
         updateButtons();
-        console.log('應用初始化完成');
+        console.log('✅ 應用初始化完成 - 點擊左上角開啟調試面板');
       }
     </script>
   </body>
