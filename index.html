@@ -150,7 +150,27 @@
     >
       <a-assets>
         <video
-          id="greenscreen-video"
+          id="greenscreen-video1"
+          src="https://raw.githubusercontent.com/isaoinvest/webAR-TEST/main/green screen.mp4"
+          preload="auto"
+          loop
+          crossorigin="anonymous"
+          playsinline
+          webkit-playsinline
+          muted
+        ></video>
+        <video
+          id="greenscreen-video2"
+          src="https://raw.githubusercontent.com/isaoinvest/webAR-TEST/main/green screen2.mp4"
+          preload="auto"
+          loop
+          crossorigin="anonymous"
+          playsinline
+          webkit-playsinline
+          muted
+        ></video>
+        <video
+          id="greenscreen-video3"
           src="https://raw.githubusercontent.com/isaoinvest/webAR-TEST/main/green screen3.mp4"
           preload="auto"
           loop
@@ -161,7 +181,7 @@
         ></video>
       </a-assets>
 
-      <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+      <a-camera position="0 0 0" look-controls="enabled: false" cursor="fuse: false; rayOrigin: mouse;" raycaster="near: 10; far: 10000; objects: .clickable"></a-camera>
 
       <a-entity id="target0" mindar-image-target="targetIndex: 0">
         <a-plane
@@ -169,7 +189,30 @@
           rotation="0 0 0"
           width="1"
           height="1"
-          chroma-key-material="src: #greenscreen-video; color: 0 1 0; similarity: 0.35; smoothness: 0.1; spill: 0.6"
+          chroma-key-material="src: #greenscreen-video1; color: 0 1 0; similarity: 0.35; smoothness: 0.1; spill: 0.6"
+          class="clickable"
+        ></a-plane>
+      </a-entity>
+
+      <a-entity id="target1" mindar-image-target="targetIndex: 1">
+        <a-plane
+          position="0 0 0"
+          rotation="0 0 0"
+          width="1"
+          height="1"
+          chroma-key-material="src: #greenscreen-video2; color: 0 1 0; similarity: 0.35; smoothness: 0.1; spill: 0.6"
+          class="clickable"
+        ></a-plane>
+      </a-entity>
+
+      <a-entity id="target2" mindar-image-target="targetIndex: 2">
+        <a-plane
+          position="0 0 0"
+          rotation="0 0 0"
+          width="1"
+          height="1"
+          chroma-key-material="src: #greenscreen-video3; color: 0 1 0; similarity: 0.35; smoothness: 0.1; spill: 0.6"
+          class="clickable"
         ></a-plane>
       </a-entity>
     </a-scene>
@@ -337,9 +380,13 @@
           }
         });
 
-        // 主程式邏輯
-        const video = document.querySelector("#greenscreen-video");
-        const targetEl = document.querySelector("#target0");
+        // 主程式邏輯 - 支援多視頻
+        const videos = [
+          { id: 'greenscreen-video1', targetId: 'target0' },
+          { id: 'greenscreen-video2', targetId: 'target1' },
+          { id: 'greenscreen-video3', targetId: 'target2' }
+        ];
+
         const scanningOverlay = document.getElementById("scanning-overlay");
         const playButton = document.getElementById("play-button");
         const soundButton = document.getElementById("sound-button");
@@ -349,124 +396,174 @@
         const soundOffIcon = document.getElementById("sound-off-icon");
 
         const state = {
-          targetFound: false,
+          anyTargetFound: false,
           audioEnabled: false,
-          isPlaying: false,
-          videoReady: false
+          videoStates: {}  // 每個視頻的狀態: { playing: false, hasInteracted: false }
         };
 
-        // 視頻錯誤處理
-        video.addEventListener('error', (e) => {
-          console.error('視頻載入錯誤:', e);
-          const error = video.error;
-          let errorMsg = '視頻載入失敗';
-          if (error) {
-            switch (error.code) {
-              case 1: errorMsg = '視頻載入被中止'; break;
-              case 2: errorMsg = '網絡錯誤'; break;
-              case 3: errorMsg = '視頻解碼失敗 - 格式可能不支援'; break;
-              case 4: errorMsg = '視頻格式不支援'; break;
-            }
+        // 初始化每個視頻的狀態
+        videos.forEach(v => {
+          state.videoStates[v.id] = { playing: false, hasInteracted: false };
+          const video = document.getElementById(v.id);
+          if (video) {
+            // 視頻錯誤處理
+            video.addEventListener('error', (e) => {
+              console.error(`視頻 ${v.id} 載入錯誤:`, e);
+              const error = video.error;
+              let errorMsg = `視頻 ${v.id} 載入失敗`;
+              if (error) {
+                switch (error.code) {
+                  case 1: errorMsg = `視頻 ${v.id} 載入被中止`; break;
+                  case 2: errorMsg = `視頻 ${v.id} 網絡錯誤`; break;
+                  case 3: errorMsg = `視頻 ${v.id} 解碼失敗 - 格式可能不支援`; break;
+                  case 4: errorMsg = `視頻 ${v.id} 格式不支援`; break;
+                }
+              }
+              showError(errorMsg);
+            });
+
+            // 視頻載入完成
+            video.addEventListener('loadeddata', () => {
+              console.log(`視頻 ${v.id} 載入完成，格式:`, video.videoWidth + 'x' + video.videoHeight);
+            });
           }
-          showError(errorMsg);
         });
 
-        // 視頻載入完成
-        video.addEventListener('loadeddata', () => {
-          state.videoReady = true;
-          console.log('視頻載入完成，格式:', video.videoWidth + 'x' + video.videoHeight);
-        });
+        // 全域音頻控制 (影響所有視頻)
+        const toggleAudio = () => {
+          state.audioEnabled = !state.audioEnabled;
+          videos.forEach(v => {
+            const video = document.getElementById(v.id);
+            if (video) video.muted = !state.audioEnabled;
+          });
+          updateButtons();
+        };
 
+        soundButton.addEventListener("click", toggleAudio);
+
+        // 全域播放控制 (影響所有視頻，作為備用)
         const updateButtons = () => {
-          playIcon.style.display = state.isPlaying ? "none" : "block";
-          pauseIcon.style.display = state.isPlaying ? "block" : "none";
-          playButton.classList.toggle("active", state.isPlaying);
+          const anyPlaying = Object.values(state.videoStates).some(s => s.playing);
+          playIcon.style.display = anyPlaying ? "none" : "block";
+          pauseIcon.style.display = anyPlaying ? "block" : "none";
+          playButton.classList.toggle("active", anyPlaying);
           soundOnIcon.style.display = state.audioEnabled ? "block" : "none";
           soundOffIcon.style.display = state.audioEnabled ? "none" : "block";
           soundButton.classList.toggle("active", state.audioEnabled);
         };
 
-        const toggleAudio = () => {
-          state.audioEnabled = !state.audioEnabled;
-          video.muted = !state.audioEnabled;
+        const toggleAllPlayPause = () => {
+          const anyPlaying = Object.values(state.videoStates).some(s => s.playing);
+          videos.forEach(v => {
+            const video = document.getElementById(v.id);
+            const videoState = state.videoStates[v.id];
+            if (video) {
+              if (anyPlaying) {
+                video.pause();
+                videoState.playing = false;
+              } else {
+                playVideo(video, videoState, v.id);
+              }
+            }
+          });
           updateButtons();
         };
 
-        const playVideo = async () => {
-          if (!state.videoReady) {
-            console.log('視頻尚未準備好');
-            return;
-          }
+        playButton.addEventListener("click", toggleAllPlayPause);
 
+        // 單一視頻播放函數
+        const playVideo = async (video, videoState, videoId) => {
           try {
             await video.play();
-            state.isPlaying = true;
-            updateButtons();
+            videoState.playing = true;
+            console.log(`視頻 ${videoId} 播放中`);
           } catch (error) {
-            console.error('影片播放失敗:', error);
-            
-            // 嘗試靜音播放
-            if (!video.muted) {
-              console.log('嘗試靜音播放...');
-              video.muted = true;
-              state.audioEnabled = false;
-              try {
-                await video.play();
-                state.isPlaying = true;
-                updateButtons();
-                showError('已自動切換為靜音播放');
-              } catch (retryError) {
-                console.error('重試播放失敗:', retryError);
-                showError('播放失敗，請檢查瀏覽器權限');
-              }
-            } else {
-              showError('播放失敗，請重新載入頁面');
-            }
+            console.error(`視頻 ${videoId} 播放失敗:`, error);
+            showError(`播放 ${videoId} 失敗，請檢查瀏覽器權限`);
           }
         };
 
-        const pauseVideo = () => {
+        const pauseVideo = (video, videoState, videoId) => {
           video.pause();
-          state.isPlaying = false;
-          updateButtons();
+          videoState.playing = false;
+          console.log(`視頻 ${videoId} 已暫停`);
         };
 
-        const togglePlayPause = () => {
-          if (state.isPlaying) {
-            pauseVideo();
-          } else {
-            playVideo();
+        // 為每個 target 設置事件
+        videos.forEach(v => {
+          const video = document.getElementById(v.id);
+          const targetEl = document.getElementById(v.targetId);
+          const videoState = state.videoStates[v.id];
+          const videoPlane = targetEl.querySelector('a-plane');  // 點擊目標
+
+          if (targetEl && video) {
+            targetEl.addEventListener("targetFound", () => {
+              console.log(`${v.targetId} 目標識別成功`);
+              state.anyTargetFound = true;
+              video.currentTime = 0;
+              scanningOverlay.classList.add("hidden");
+
+              // 自動播放 (靜音)
+              if (!videoState.hasInteracted) {
+                video.muted = true;
+                playVideo(video, videoState, v.id);
+              }
+            });
+
+            targetEl.addEventListener("targetLost", () => {
+              console.log(`${v.targetId} 目標丟失`);
+              pauseVideo(video, videoState, v.id);
+              // 只在所有 target 都丟失時顯示 overlay
+              const allLost = videos.every(v2 => {
+                const t = document.getElementById(v2.targetId);
+                return !t.components['mindar-image-target'].data.found;
+              });
+              if (allLost) {
+                state.anyTargetFound = false;
+                scanningOverlay.classList.remove("hidden");
+              }
+            });
           }
-        };
 
-        playButton.addEventListener("click", togglePlayPause);
-        soundButton.addEventListener("click", toggleAudio);
+          // 點擊視頻平面來 toggle 播放/暫停 和 unmute
+          if (videoPlane) {
+            videoPlane.addEventListener("click", (event) => {
+              console.log(`點擊 ${v.id} 平面`);
+              event.stopPropagation();
+              event.preventDefault();
 
-        targetEl.addEventListener("targetFound", () => {
-          console.log('目標識別成功');
-          state.targetFound = true;
-          video.currentTime = 0;
-          playVideo();
-          scanningOverlay.classList.add("hidden");
-        });
+              if (!videoState.hasInteracted) {
+                video.muted = false;  // unmute
+                videoState.hasInteracted = true;
+                console.log(`視頻 ${v.id} 取消靜音`);
+              }
 
-        targetEl.addEventListener("targetLost", () => {
-          console.log('目標丟失');
-          state.targetFound = false;
-          pauseVideo();
-          scanningOverlay.classList.remove("hidden");
+              if (!videoState.playing) {
+                playVideo(video, videoState, v.id);
+              } else {
+                pauseVideo(video, videoState, v.id);
+              }
+              updateButtons();
+            });
+          }
         });
 
         document.addEventListener("visibilitychange", () => {
           if (document.hidden) {
-            pauseVideo();
-          } else if (state.targetFound) {
-            playVideo();
+            videos.forEach(v => {
+              const video = document.getElementById(v.id);
+              const videoState = state.videoStates[v.id];
+              if (video && videoState.playing) {
+                pauseVideo(video, videoState, v.id);
+              }
+            });
+          } else if (state.anyTargetFound) {
+            // 恢復播放邏輯依賴 targetFound
           }
         });
 
         updateButtons();
-        console.log('應用初始化完成');
+        console.log('多視頻 AR 應用初始化完成');
       }
     </script>
   </body>
