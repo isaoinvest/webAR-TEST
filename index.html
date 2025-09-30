@@ -318,13 +318,13 @@
                     
                     // 調整 mask 計算
                     float baseMask = totalDist - u_similarity;
-                    float alpha = 1.0 - smoothstep(0.0, u_smoothness, baseMask);  // 反轉：距離小時 alpha=0 (透明)
+                    float alpha = smoothstep(0.0, u_smoothness, baseMask);  // 修正：距離大時 alpha=1 (不透明)，小(alpha=0, 透明)
                     
                     // 加強 spill suppression (應用到所有非全透明像素)
                     vec3 finalColor = texColor;
-                    float spillAmount = (1.0 - alpha) * u_spill * 2.0;  // 加強抑制
+                    float spillAmount = (1.0 - alpha) * u_spill * 2.0;  // 當接近綠時 spillAmount 大
                     float greenness = texColor.g - max(texColor.r, texColor.b);
-                    if (greenness > 0.1 && alpha > 0.0) {  // 降低閾值，捕捉更多綠溢出
+                    if (greenness > 0.1) {  // 修正：移除 alpha > 0.0 檢查，捕捉更多綠溢出並抑制
                       finalColor.g = mix(texColor.g, (texColor.r + texColor.b) / 2.0, spillAmount);
                     }
                     
