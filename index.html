@@ -398,8 +398,8 @@
           },
 
           remove: function () {
-            if (this.rafId) {
-              cancelAnimationFrame(this.rafId);
+            if (rafId) {
+              cancelAnimationFrame(rafId);
             }
           }
         });
@@ -506,6 +506,14 @@
         // 單一視頻播放函數
         const playVideo = async (video, videoState, videoId) => {
           try {
+            // 確保視頻準備好
+            if (video.readyState < 2) {
+              await new Promise((resolve, reject) => {
+                video.addEventListener('loadeddata', resolve, { once: true });
+                video.addEventListener('error', reject, { once: true });
+                video.load();
+              });
+            }
             await video.play();
             videoState.playing = true;
           } catch (error) {
@@ -516,9 +524,7 @@
         const pauseVideo = (video, videoState, videoId) => {
           video.pause();
           videoState.playing = false;
-          // 釋放資源以節省記憶體
-          video.src = '';
-          video.load();
+          // 移除清除 src 的邏輯，以避免下次播放錯誤
         };
 
         // 為每個 target 設置事件
@@ -531,7 +537,6 @@
           if (targetEl && video) {
             targetEl.addEventListener("targetFound", () => {
               state.anyTargetFound = true;
-              video.currentTime = 0;
               scanningOverlay.classList.add("hidden");
 
               // 暫停其他影片，限制同時播放
@@ -548,6 +553,10 @@
               // 自動播放 (靜音)
               if (!videoState.hasInteracted) {
                 video.muted = true;
+                video.currentTime = 0;
+                playVideo(video, videoState, v.id);
+              } else {
+                video.currentTime = 0;
                 playVideo(video, videoState, v.id);
               }
             });
@@ -578,6 +587,7 @@
               }
 
               if (!videoState.playing) {
+                video.currentTime = 0;
                 playVideo(video, videoState, v.id);
               } else {
                 pauseVideo(video, videoState, v.id);
