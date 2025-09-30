@@ -151,7 +151,7 @@
       <a-assets>
         <video
           id="greenscreen-video"
-          src="https://raw.githubusercontent.com/isaoinvest/webAR-TEST/main/green screen.mp4"
+          src="https://raw.githubusercontent.com/isaoinvest/webAR-TEST/main/green screen3.mp4"
           preload="auto"
           loop
           crossorigin="anonymous"
@@ -169,7 +169,7 @@
           rotation="0 0 0"
           width="1"
           height="1"
-          chroma-key-material="src: #greenscreen-video; color: 0 1 0; similarity: 0.2; smoothness: 0.03; spill: 0.4"
+          chroma-key-material="src: #greenscreen-video; color: 0 1 0; similarity: 0.35; smoothness: 0.1; spill: 0.6"
         ></a-plane>
       </a-entity>
     </a-scene>
@@ -200,9 +200,9 @@
           schema: {
             src: { type: 'selector' },
             color: { type: 'vec3', default: {x: 0.0, y: 1.0, z: 0.0} },
-            similarity: { type: 'number', default: 0.2 },
-            smoothness: { type: 'number', default: 0.03 },
-            spill: { type: 'number', default: 0.4 }
+            similarity: { type: 'number', default: 0.35 },
+            smoothness: { type: 'number', default: 0.1 },
+            spill: { type: 'number', default: 0.6 }
           },
 
           init: function () {
@@ -221,16 +221,16 @@
                 
                 // 支援多種色彩格式
                 if (THREE.RGBAFormat) {
-                  videoTexture.format = THREE.RGBAFormat;
+                  videoTexture.format = THREE.RGBFormat;  // 改為 RGBFormat，避免 RGBA 轉換 artifact
                 } else {
                   videoTexture.format = THREE.RGBFormat;
                 }
                 
                 // 根據 Three.js 版本使用正確的編碼屬性
                 if (videoTexture.colorSpace !== undefined) {
-                  videoTexture.colorSpace = THREE.SRGBColorSpace || 'srgb';
+                  videoTexture.colorSpace = THREE.SRGBColorSpace;
                 } else if (videoTexture.encoding !== undefined) {
-                  videoTexture.encoding = THREE.sRGBEncoding || 3001;
+                  videoTexture.encoding = THREE.sRGBEncoding;
                 }
                 
                 videoTexture.generateMipmaps = false;
@@ -253,11 +253,11 @@
                   uniform float u_spill;
                   varying vec2 vUv;
 
-                  // RGB 轉 YUV 色彩空間
+                  // 改進 RGB to YUV (使用 BT.709 標準係數，更準確 chroma 計算)
                   vec3 rgb2yuv(vec3 rgb) {
-                    float y = 0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b;
-                    float u = (rgb.b - y) * 0.565;
-                    float v = (rgb.r - y) * 0.713;
+                    float y = 0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b;
+                    float u = (rgb.b - y) * 0.5389;  // 精準 U = 0.5389 * (B - Y)
+                    float v = (rgb.r - y) * 0.6350;  // 精準 V = 0.6350 * (R - Y)
                     return vec3(y, u, v);
                   }
 
@@ -265,25 +265,24 @@
                     vec4 rgba = texture2D(u_texture, vUv);
                     vec3 texColor = rgba.rgb;
                     
-                    // 轉換為 YUV 以更好處理色度
                     vec3 yuvColor = rgb2yuv(texColor);
                     vec3 yuvKey = rgb2yuv(u_keyColor);
                     
-                    // 計算色度距離（只比較 UV，忽略亮度）
+                    // 計算色度距離 (UV)，增加亮度容忍以處理視頻變異
                     float chromaDist = distance(yuvColor.yz, yuvKey.yz);
+                    float lumaDiff = abs(yuvColor.x - yuvKey.x);  // 新增：輕微考慮亮度差
+                    float totalDist = chromaDist + lumaDiff * 0.2;  // 混合距離，容忍 20% 亮度變異
                     
-                    // 計算 alpha mask
-                    float baseMask = chromaDist - u_similarity;
-                    float alpha = smoothstep(0.0, u_smoothness, baseMask);
+                    // 調整 mask 計算
+                    float baseMask = totalDist - u_similarity;
+                    float alpha = 1.0 - smoothstep(0.0, u_smoothness, baseMask);  // 反轉：距離小時 alpha=0 (透明)
                     
-                    // Spill suppression - 只在半透明區域移除綠色溢出
+                    // 加強 spill suppression (應用到所有非全透明像素)
                     vec3 finalColor = texColor;
-                    if (alpha < 0.95 && alpha > 0.05) {
-                      float spillAmount = (1.0 - alpha) * u_spill;
-                      float greenness = texColor.g - max(texColor.r, texColor.b);
-                      if (greenness > 0.0) {
-                        finalColor.g = mix(texColor.g, max(texColor.r, texColor.b), spillAmount);
-                      }
+                    float spillAmount = (1.0 - alpha) * u_spill * 2.0;  // 加強抑制
+                    float greenness = texColor.g - max(texColor.r, texColor.b);
+                    if (greenness > 0.1 && alpha > 0.0) {  // 降低閾值，捕捉更多綠溢出
+                      finalColor.g = mix(texColor.g, (texColor.r + texColor.b) / 2.0, spillAmount);
                     }
                     
                     gl_FragColor = vec4(finalColor, alpha);
